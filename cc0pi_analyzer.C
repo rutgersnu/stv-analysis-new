@@ -1347,7 +1347,7 @@ void AnalysisEvent::apply_selection() {
   sel_passed_proton_pid_cut_ = true;
   sel_protons_contained_ = true;
   sel_pions_contained_ = true;
-  sel_pions_above_threshold_ = true;
+  sel_pions_above_threshold_ = false;
 
   // Set flags that default to false here
   sel_muon_contained_ = false;
@@ -1444,8 +1444,8 @@ void AnalysisEvent::apply_selection() {
   }
 
   sel_CC0pi_ = sel_nu_mu_cc_ && sel_no_reco_showers_
-    && sel_muon_passed_mom_cuts_ //&& sel_muon_contained_ && sel_muon_quality_ok_
-    && sel_pions_contained_ && !sel_pions_above_threshold_;
+    && sel_muon_passed_mom_cuts_ && sel_muon_contained_ && sel_muon_quality_ok_
+    && !sel_pions_above_threshold_;
 
   // Don't bother to apply the cuts that involve the leading
   // proton candidate if we don't have one
