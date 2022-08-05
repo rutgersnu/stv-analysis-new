@@ -41,7 +41,7 @@ void cc0pi_effpur() {
     "mc_vertex_in_FV && mc_neutrino_is_numu && mc_muon_in_mom_range",
     "mc_vertex_in_FV && mc_neutrino_is_numu && mc_muon_in_mom_range && mc_no_fs_pi0_",
     "mc_vertex_in_FV && mc_neutrino_is_numu && mc_muon_in_mom_range && mc_no_fs_pi0_ && mc_no_charged_pi_above_threshold_",
-    "mc_is_signal"
+    "mc_is_cc0pi_signal"
   };
 
   const std::vector< std::string > selection_defs = {
@@ -49,17 +49,21 @@ void cc0pi_effpur() {
     "sel_reco_vertex_in_FV",
     "sel_reco_vertex_in_FV && sel_pfp_starts_in_PCV",
     "sel_nu_mu_cc",
-    "sel_nu_mu_cc && sel_muon_passed_mom_cuts",
+    "sel_nu_mu_cc && sel_no_reco_showers",
     "sel_nu_mu_cc && sel_no_reco_showers && sel_muon_passed_mom_cuts",
     //"sel_nu_mu_cc && sel_no_reco_showers && sel_muon_passed_mom_cuts && sel_muon_quality_ok",
     //"sel_nu_mu_cc && sel_no_reco_showers && sel_muon_passed_mom_cuts && sel_muon_quality_ok && !sel_pions_above_threshold",
-    "sel_nu_mu_cc && sel_no_reco_showers && sel_muon_passed_mom_cuts && sel_muon_contained",
-    "sel_nu_mu_cc && sel_no_reco_showers && sel_muon_passed_mom_cuts && sel_muon_contained && sel_muon_quality_ok",
-    "sel_nu_mu_cc && sel_no_reco_showers && sel_muon_passed_mom_cuts && sel_muon_contained && sel_muon_quality_ok && !sel_pions_above_threshold"
+    "sel_nu_mu_cc && sel_no_reco_showers && sel_muon_passed_mom_cuts && !sel_pions_above_threshold",
+    //"sel_CC0pi"
   };
-
+/*
+  sel_CC0pi_ = sel_nu_mu_cc_ && sel_no_reco_showers_
+    && sel_muon_passed_mom_cuts_ && sel_muon_quality_ok_ //&& sel_muon_contained_
+    && !sel_pions_above_threshold_;
+*/
   TChain stv_ch( "stv_tree" );
-  stv_ch.Add( "/uboone/data/users/mastbaum/stv-analysis-ru2/rustv-prodgenie_bnb_nu_uboone_overlay_mcc9.1_v08_00_00_26_filter_run1_reco2_reco2.root" );
+  //stv_ch.Add( "/uboone/data/users/mastbaum/stv-analysis-ru3/rustv-prodgenie_bnb_nu_uboone_overlay_mcc9.1_v08_00_00_26_filter_run1_reco2_reco2.root" );
+  stv_ch.Add( "test.root" );
 
   size_t num_points = selection_defs.size();
   TGraph* eff_graph = new TGraph( num_points );
@@ -86,12 +90,12 @@ void cc0pi_effpur() {
     "in FV",
     "starts contained",
     "CCincl",
-    "#mu momentum limits",
     "no showers",
-    "#mu contained",
-    "#mu quality",
+    "#mu momentum limits",
+    //"#mu quality",
     "#pi^{#pm} threshold"
   };
+    //"sel_nu_mu_cc && sel_no_reco_showers && sel_muon_passed_mom_cuts && sel_muon_quality_ok_ && !sel_pions_above_threshold",
 
   TCanvas* c1 = new TCanvas;
   c1->SetBottomMargin(0.27);

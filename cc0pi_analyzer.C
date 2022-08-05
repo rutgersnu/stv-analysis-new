@@ -15,9 +15,13 @@
 // ROOT includes
 #include "TChain.h"
 #include "TFile.h"
+#include "TNtuple.h"
 #include "TParameter.h"
 #include "TTree.h"
 #include "TVector3.h"
+
+// XGBoost
+#include <xgboost/c_api.h>
 
 // STV analysis includes
 #include "EventCategory.hh"
@@ -70,6 +74,14 @@ bool is_meson_or_antimeson( int pdg_code ) {
   return true;
 }
 
+// XGBoost models
+const std::map<std::string, std::string> models = {
+  {"softmax",  "cc0pi_fstrack_pid_softmax.json"},
+  {"softprob", "cc0pi_fstrack_pid_softprob.json" }
+};
+
+std::map<std::string, BoosterHandle*> boosters;
+
 // A few helpful dummy constants
 constexpr float BOGUS = 9999.;
 constexpr int BOGUS_INT = 9999;
@@ -95,19 +107,21 @@ constexpr float DEFAULT_PROTON_PID_CUT = 0.2;
 constexpr float LEAD_P_MIN_MOM_CUT = 0.250; // GeV/c
 constexpr float LEAD_P_MAX_MOM_CUT = 1.; // GeV/c
 constexpr float MUON_P_MIN_MOM_CUT = 0.100; // GeV/c
-constexpr float MUON_P_MAX_MOM_CUT = 1.200; // GeV/c
-constexpr float CHARGED_PI_MOM_CUT = 0.160; // GeV/c
+constexpr float MUON_P_MAX_MOM_CUT = 2.500; // GeV/c
+constexpr float CHARGED_PI_MOM_CUT = 0.170; // GeV/c
 constexpr float MUON_MOM_QUALITY_CUT = 0.25; // fractional difference
+//constexpr float PID_CHISQ_PID_CUT = 50;
 
-constexpr float TOPO_SCORE_CUT = 0.1;
-constexpr float COSMIC_IP_CUT = 10.; // cm
+constexpr float TOPO_SCORE_CUT = 0.15;
+constexpr float COSMIC_IP_CUT = 25.; // cm
 
-constexpr float MUON_TRACK_SCORE_CUT = 0.8;
-constexpr float MUON_VTX_DISTANCE_CUT = 4.; // cm
-constexpr float MUON_LENGTH_CUT = 10.; // cm
-constexpr float MUON_PID_CUT = 0.2;
+//constexpr float MUON_TRACK_SCORE_CUT = 0.9;
+//constexpr float MUON_VTX_DISTANCE_CUT = 4.; // cm
+//constexpr float MUON_LENGTH_CUT = 10.; // cm
+//constexpr float PION_LENGTH_CUT = 20.; // cm
+//constexpr float MUON_PID_CUT = 0.5;
 
-constexpr float TRACK_SCORE_CUT = 0.5;
+constexpr float TRACK_SCORE_CUT = 0.7;
 
 // Function that defines the track-length-dependent proton PID cut
 double proton_pid_cut( double track_length ) {
@@ -160,9 +174,8 @@ class AnalysisEvent {
 
   public:
 
-    AnalysisEvent() {}
-
-    ~AnalysisEvent() {}
+    AnalysisEvent();
+    ~AnalysisEvent();
 
     EventCategory categorize_event();
     void apply_selection();
@@ -171,6 +184,9 @@ class AnalysisEvent {
     void find_lead_p_candidate();
     void compute_observables();
     void compute_mc_truth_observables();
+    int predict_track_pid(int p, std::string model="softmax", float* out=NULL);
+
+    //std::map<std::string, BoosterHandle*> boosters;
 
     // Event scores needed for numu CC selection
     float topological_score_ = BOGUS;
@@ -249,7 +265,6 @@ class AnalysisEvent {
 
     // Proton *kinetic* energy using range-based momentum reconstruction
     MyPointer< std::vector<float> > track_kinetic_energy_p_;
-
     MyPointer< std::vector<float> > track_range_mom_mu_;
     MyPointer< std::vector<float> > track_mcs_mom_mu_;
     MyPointer< std::vector<float> > track_chi2_proton_;
@@ -389,6 +404,9 @@ class AnalysisEvent {
     // ordered from highest to lowest by magnitude
     MyPointer< std::vector<TVector3> > p3_p_vec_;
 
+    // Final state track IDs
+    MyPointer< std::vector<short> > xgb_pid_vec_;
+
     // Reco STVs
     float delta_pT_ = BOGUS;
     float delta_phiT_ = BOGUS;
@@ -434,7 +452,13 @@ class AnalysisEvent {
       return ( x_inside_PCV && y_inside_PCV && z_inside_PCV );
     }
 
+
 };
+
+
+AnalysisEvent::AnalysisEvent() {}
+AnalysisEvent::~AnalysisEvent() {}
+
 
 // Helper function to set branch addresses for reading information
 // from the Event TTree
@@ -770,6 +794,9 @@ void set_event_output_branch_addresses(TTree& out_tree, AnalysisEvent& ev,
   set_object_output_branch_address< std::vector<TVector3> >( out_tree,
     "p3_p_vec", ev.p3_p_vec_, create );
 
+  set_object_output_branch_address< std::vector<short> >( out_tree,
+    "xgb_pid_vec", ev.xgb_pid_vec_, create );
+
   // True 3-momenta (muon, leading proton)
   set_object_output_branch_address< TVector3 >( out_tree,
     "mc_p3_mu", ev.mc_p3_mu_, create );
@@ -1015,6 +1042,7 @@ void set_event_output_branch_addresses(TTree& out_tree, AnalysisEvent& ev,
 
 }
 
+
 void analyze(const std::vector<std::string>& in_file_names,
   const std::string& output_filename)
 {
@@ -1053,6 +1081,10 @@ void analyze(const std::vector<std::string>& in_file_names,
 
   summed_pot_param->Write();
 
+  //TFile* fpred = TFile::Open("fpred.root", "recreate");
+  //TNtuple* ntpred = new TNtuple("pred", "" ,"trk_len_v:pfnhits:trk_distance_v:trk_score_v:trk_llr_pid_score_v:trk_pid_chipr_v:trk_ctz:trk_energy_proton_v:trk_range_muon_mom_v:trk_mcs_muon_mom_v:backtracked_pdg:prediction:sel_nu_mu_cc");
+  //out_file->cd();
+
   // EVENT LOOP
   // TChains can potentially be really big (and spread out over multiple
   // files). When that's the case, calling TChain::GetEntries() can be very
@@ -1084,6 +1116,8 @@ void analyze(const std::vector<std::string>& in_file_names,
     // then terminate the event loop
     if ( local_entry < 0 ) break;
 
+    if (events_entry>10000) break;
+
     // Load all of the branches for which we've called
     // TChain::SetBranchAddress() above
     events_ch.GetEntry( events_entry );
@@ -1112,6 +1146,9 @@ void analyze(const std::vector<std::string>& in_file_names,
   out_tree->Write();
   out_file->Close();
   delete out_file;
+
+  //fpred->cd();
+  //ntpred->Write();
 }
 
 // Sets the signal definition flags and returns an event category based on MC
@@ -1259,6 +1296,90 @@ void AnalysisEvent::apply_numu_CC_selection() {
     && sel_has_muon_candidate_ && sel_topo_cut_passed_;
 }
 
+
+int AnalysisEvent::predict_track_pid(int p, std::string model, float* out) {
+  // Only consider tracks
+  float track_score = pfp_track_score_->at( p );
+  float track_length = track_length_->at( p );
+  if ( track_score <= TRACK_SCORE_CUT || track_length <= 0 ) return BOGUS_INDEX;
+ 
+  // Observables vector
+  float trk_ctz = track_dirz_->at(p) /
+                    sqrt(track_dirx_->at(p)*track_dirx_->at(p) +
+                         track_diry_->at(p)*track_diry_->at(p) +
+                         track_dirz_->at(p)*track_dirz_->at(p));
+ 
+  float fs_v[] = {
+    track_length_->at(p),
+    (float) pfp_hits_->at(p),
+    track_start_distance_->at(p),
+    pfp_track_score_->at(p),
+    track_llr_pid_score_->at(p),
+    track_chi2_proton_->at(p),
+    trk_ctz,
+    track_kinetic_energy_p_->at(p),
+    track_range_mom_mu_->at(p),
+    track_mcs_mom_mu_->at(p),
+  };
+
+  // Check for inf/nans
+  bool fs_v_ok = true;
+  for (size_t i=0; i<10; i++) {
+    if (std::isnan(fs_v[i]) || std::isinf(fs_v[i])) {
+      fs_v_ok = false;
+      break;
+    }
+  }
+ 
+  if (fs_v_ok) {
+    int r;  // XGBoost return codes
+
+    // Create input DMatrix
+    DMatrixHandle dmat;
+    r = XGDMatrixCreateFromMat(fs_v, 1, 10, -1, &dmat);
+    if (r != 0) std::cout << XGBGetLastError() << std::endl;
+    assert(r == 0);
+ 
+    // Load trained model from JSON
+    const char* c_json_config = "{\"type\": 0,\"training\": false,\"iteration_begin\": 0,\"iteration_end\": 0,\"strict_shape\": false}";
+    const unsigned long int* out_shape;
+    unsigned long int out_dim;
+    const float* out_result;
+ 
+    r = XGBoosterPredictFromDMatrix(*boosters[model], dmat, c_json_config,
+                                    &out_shape, &out_dim, &out_result);
+    if (r != 0) std::cout << XGBGetLastError() << std::endl;
+    assert(r == 0);
+
+    XGDMatrixFree(dmat);
+
+    if (model == "softmax") {
+//std::cout << "softmax " << out_result[0] << std::endl;
+      return out_result[0];
+    }
+    else if (model == "softprob") {
+      int size = sizeof(float) * out_dim;
+      //*out = std::vector<float>(out_dim, out_dim + size);
+      memcpy(out, out_result, size);
+
+      int idx_max = 0;
+      float v_max = -1;
+      for (int k=0; k<out_dim; k++) {
+        if (out_result[k] > v_max) {
+          v_max = out_result[k];
+          idx_max = k;
+        }
+      }
+
+//std::cout << "softprob " << idx_max << std::endl;
+      return idx_max;
+    }
+  }
+
+  return BOGUS_INDEX;
+}
+
+
 // Sets the index of the muon candidate in the track vectors, or BOGUS_INDEX if
 // one could not be found. The sel_has_muon_candidate_ flag is also set by this
 // function.
@@ -1266,6 +1387,7 @@ void AnalysisEvent::find_muon_candidate() {
 
   std::vector<int> muon_candidate_indices;
   std::vector<int> muon_pid_scores;
+  float out[4];
 
   for ( int p = 0; p < num_pf_particles_; ++p ) {
     // Only direct neutrino daughters (generation == 2) will be considered as
@@ -1273,6 +1395,13 @@ void AnalysisEvent::find_muon_candidate() {
     unsigned int generation = pfp_generation_->at( p );
     if ( generation != 2u ) continue;
 
+    int pid = predict_track_pid(p, "softprob", out);
+
+    if ( pid == 1 ) {
+      muon_candidate_indices.push_back( p );
+      muon_pid_scores.push_back( out[1] );
+    }
+/*
     float track_score = pfp_track_score_->at( p );
     float start_dist = track_start_distance_->at( p );
     float track_length = track_length_->at( p );
@@ -1286,6 +1415,7 @@ void AnalysisEvent::find_muon_candidate() {
       muon_candidate_indices.push_back( p );
       muon_pid_scores.push_back( pid_score );
     }
+*/
   }
 
   size_t num_candidates = muon_candidate_indices.size();
@@ -1352,6 +1482,11 @@ void AnalysisEvent::apply_selection() {
   // Set flags that default to false here
   sel_muon_contained_ = false;
 
+  xgb_pid_vec_->clear();
+  xgb_pid_vec_->resize(num_pf_particles_, BOGUS_INDEX);
+
+  float out[4];
+
   for ( int p = 0; p < num_pf_particles_; ++p ) {
 
     // Only worry about direct neutrino daughters (PFParticles considered
@@ -1400,16 +1535,68 @@ void AnalysisEvent::apply_selection() {
 
     }
     else {
-
-      float track_score = pfp_track_score_->at( p );
-      if ( track_score <= TRACK_SCORE_CUT ) continue;
-
-      // Bad tracks in the searchingfornues TTree can have
-      // bogus track lengths. This skips those.
+      // FS PFP is not the primary muon.
       float track_length = track_length_->at( p );
-      if ( track_length <= 0. ) continue;
+      float track_score = pfp_track_score_->at( p );
+      if ( track_score <= TRACK_SCORE_CUT || track_length <= 0 ) continue;
 
-      // We found a reco track that is not the muon candidate.
+/*
+      float trk_ctz = track_dirz_->at(p) /
+                        sqrt(track_dirx_->at(p)*track_dirx_->at(p) +
+                             track_diry_->at(p)*track_diry_->at(p) +
+                             track_dirz_->at(p)*track_dirz_->at(p));
+
+      float fs_v[] = {
+        track_length_->at(p),
+        (float) pfp_hits_->at(p),
+        track_start_distance_->at(p),
+        pfp_track_score_->at(p),
+        track_llr_pid_score_->at(p),
+        track_chi2_proton_->at(p),
+        trk_ctz,
+        track_kinetic_energy_p_->at(p),
+        track_range_mom_mu_->at(p),
+        track_mcs_mom_mu_->at(p),
+      };
+
+      bool fs_v_ok = true;
+      for (size_t i=0; i<10; i++) {
+        if (std::isnan(fs_v[i]) || std::isinf(fs_v[i])) {
+          fs_v_ok = false;
+          break;
+        }
+      }
+
+      //float predict = -9999;
+      if (fs_v_ok) {
+        DMatrixHandle dmat;
+        int r;
+        r = XGDMatrixCreateFromMat(fs_v, 1, 10, -1, &dmat);
+        if (r!=0) std::cout << XGBGetLastError() << std::endl;
+        assert(r == 0);
+
+        const char* c_json_config = "{\"type\": 0,\"training\": false,\"iteration_begin\": 0,\"iteration_end\": 0,\"strict_shape\": false}";
+        const unsigned long int* out_shape;
+        unsigned long int out_dim;
+        const float* out_result;
+
+        r = XGBoosterPredictFromDMatrix(booster, dmat, c_json_config, &out_shape,
+                                    &out_dim, &out_result);
+        if (r!=0) std::cout << XGBGetLastError() << std::endl;
+        assert(r == 0);
+
+        xgb_pid_vec_->at(p) = out_result[0];
+        //predict = out_result[0];
+      }
+*/
+      //float outv[13];
+      //memcpy(outv, fs_v, sizeof(fs_v));
+      //outv[10] = pfp_true_pdg_->at(p);
+      //outv[11] = predict;
+      //outv[12] = sel_nu_mu_cc_;
+      //ntpred->Fill(outv);
+
+      xgb_pid_vec_->at(p) = predict_track_pid(p, "softprob", out);
 
       // Check whether it fails the containment cut
       float endx = track_endx_->at( p );
@@ -1417,17 +1604,16 @@ void AnalysisEvent::apply_selection() {
       float endz = track_endz_->at( p );
       bool end_contained = this->in_proton_containment_vol( endx, endy, endz );
 
-      //sel_has_p_candidate_ = false;
-      float llr_pid_score = track_llr_pid_score_->at( p );
-
-      // Check whether the current proton candidate fails the proton PID cut
-      if ( llr_pid_score <= proton_pid_cut(track_length) ) {
+      if (xgb_pid_vec_->at(p) == 3) {
         // Proton candidate
         sel_has_p_candidate_ = true;
-        sel_passed_proton_pid_cut_ = true;
+        if ( track_llr_pid_score_->at(p) <= proton_pid_cut(track_length) ) {
+          sel_passed_proton_pid_cut_ = true;
+        }
         if ( !end_contained ) sel_protons_contained_ = false;
       }
-      else {
+      else if ((xgb_pid_vec_->at(p) == 1 && out[1] > 0.1) ||
+               (xgb_pid_vec_->at(p) == 2 && out[2] > 0.1)) {
         // Pion candidate
         sel_has_pi_candidate_ = true;
         if ( !end_contained ) sel_pions_contained_ = false;
@@ -1440,11 +1626,38 @@ void AnalysisEvent::apply_selection() {
           sel_pions_above_threshold_ = true;
         }
       }
+
+/*
+      //sel_has_p_candidate_ = false;
+      float llr_pid_score = track_llr_pid_score_->at( p );
+
+      // Check whether the current proton candidate fails the proton PID cut
+      if ( llr_pid_score <= proton_pid_cut(track_length) ) {
+        // Proton candidate
+        sel_has_p_candidate_ = true;
+        sel_passed_proton_pid_cut_ = true;
+        if ( !end_contained ) sel_protons_contained_ = false;
+      }
+      else if (track_length > PION_LENGTH_CUT && track_chi2_proton_->at(p) > PID_CHISQ_PID_CUT) {
+        // Pion candidate
+        sel_has_pi_candidate_ = true;
+        if ( !end_contained ) sel_pions_contained_ = false;
+
+        float pi_mom = LOW_FLOAT;
+        if ( end_contained ) pi_mom = track_range_mom_mu_->at( p );
+        else pi_mom = track_mcs_mom_mu_->at( p );
+
+        if ( pi_mom >= CHARGED_PI_MOM_CUT ) {
+          sel_pions_above_threshold_ = true;
+        }
+      }
+*/
+
     }
   }
 
   sel_CC0pi_ = sel_nu_mu_cc_ && sel_no_reco_showers_
-    && sel_muon_passed_mom_cuts_ && sel_muon_contained_ && sel_muon_quality_ok_
+    && sel_muon_passed_mom_cuts_ //&& sel_muon_quality_ok_ //&& sel_muon_contained_
     && !sel_pions_above_threshold_;
 
   // Don't bother to apply the cuts that involve the leading
@@ -1476,6 +1689,7 @@ void AnalysisEvent::apply_selection() {
       && sel_has_p_candidate_ && sel_passed_proton_pid_cut_
       && sel_protons_contained_ && sel_lead_p_passed_mom_cuts_;
   }
+
 }
 
 void AnalysisEvent::find_lead_p_candidate() {
@@ -1719,12 +1933,21 @@ void AnalysisEvent::compute_mc_truth_observables() {
 void analyzer(const std::string& in_file_name,
  const std::string& output_filename)
 {
+  for (auto const& m : models) {
+    boosters[m.first] = new BoosterHandle;
+    XGBoosterCreate(0, 0, boosters[m.first]);
+    XGBoosterLoadModel(*boosters[m.first], m.second.c_str());
+  }
+
   std::vector<std::string> in_files = { in_file_name };
   analyze( in_files, output_filename );
+
+  for (auto const& b : boosters) {
+    XGBoosterFree(*b.second);
+  }
 }
 
 int main( int argc, char* argv[] ) {
-
   if ( argc != 3 ) {
     std::cout << "Usage: analyzer INPUT_PELEE_NTUPLE_FILE OUTPUT_FILE\n";
     return 1;
