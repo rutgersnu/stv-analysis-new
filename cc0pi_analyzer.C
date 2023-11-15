@@ -108,7 +108,7 @@ constexpr float LEAD_P_MIN_MOM_CUT = 0.250; // GeV/c
 constexpr float LEAD_P_MAX_MOM_CUT = 1.; // GeV/c
 constexpr float MUON_P_MIN_MOM_CUT = 0.100; // GeV/c
 constexpr float MUON_P_MAX_MOM_CUT = 2.500; // GeV/c
-constexpr float CHARGED_PI_MOM_CUT = 0.170; // GeV/c
+constexpr float CHARGED_PI_MOM_CUT = 0.07; // GeV/c            #Previous-Value: 0.170 GeV/c [probably to take into consideration ANNIE's acceptance]. 
 constexpr float MUON_MOM_QUALITY_CUT = 0.25; // fractional difference
 //constexpr float PID_CHISQ_PID_CUT = 50;
 
@@ -372,6 +372,9 @@ class AnalysisEvent {
     // Whether at least one generation == 2 reco track exists that is not the
     // muon candidate
     bool sel_has_p_candidate_ = false;
+
+    int proton_multiplicity_ = 0;
+
     bool sel_has_pi_candidate_ = false;
     // Whether all proton candidates (i.e., all tracks which are not the muon
     // candidate) pass the proton PID cut or not
@@ -750,6 +753,9 @@ void set_event_output_branch_addresses(TTree& out_tree, AnalysisEvent& ev,
   set_output_branch_address( out_tree, "sel_has_p_candidate",
     &ev.sel_has_p_candidate_, create, "sel_has_p_candidate/O" );
 
+  set_output_branch_address( out_tree, "proton_multiplicity",
+    &ev.proton_multiplicity_, create, "proton_multiplicity/I" );
+
   set_output_branch_address( out_tree, "sel_has_pi_candidate",
     &ev.sel_has_pi_candidate_, create, "sel_has_pi_candidate/O" );
 
@@ -1076,6 +1082,8 @@ void analyze(const std::vector<std::string>& in_file_names,
     }
   }
 
+  std::cout<<"POT: "<<summed_pot<<std::endl;
+
   TParameter<float>* summed_pot_param = new TParameter<float>( "summed_pot",
     summed_pot );
 
@@ -1116,7 +1124,7 @@ void analyze(const std::vector<std::string>& in_file_names,
     // then terminate the event loop
     if ( local_entry < 0 ) break;
 
-    if (events_entry>10000) break;
+    //if (events_entry>10000) break;
 
     // Load all of the branches for which we've called
     // TChain::SetBranchAddress() above
@@ -1308,23 +1316,31 @@ int AnalysisEvent::predict_track_pid(int p, std::string model, float* out) {
                     sqrt(track_dirx_->at(p)*track_dirx_->at(p) +
                          track_diry_->at(p)*track_diry_->at(p) +
                          track_dirz_->at(p)*track_dirz_->at(p));
- 
+
+  float trk_relative_dif_mcs_range = (track_mcs_mom_mu_->at(p) - track_range_mom_mu_->at(p))/track_range_mom_mu_->at(p);
+
+  bool x_inside_FV = ( 21.5 < track_endx_->at(p) ) && ( track_endx_->at(p) < 234.85 );
+  bool y_inside_FV = ( -95.0 < track_endy_->at(p) ) && ( track_endy_->at(p) < 95.0 );
+  bool z_inside_FV = ( 21.5 < track_endz_->at(p) ) && ( track_endz_->at(p) < 966.8 );
+  bool trk_contained = (x_inside_FV && y_inside_FV && z_inside_FV);
+  unsigned int num_daughters = pfp_trk_daughters_count_->at(p) + pfp_shr_daughters_count_->at(p);
+
+
   float fs_v[] = {
-    track_length_->at(p),
     (float) pfp_hits_->at(p),
     track_start_distance_->at(p),
     pfp_track_score_->at(p),
     track_llr_pid_score_->at(p),
     track_chi2_proton_->at(p),
-    trk_ctz,
     track_kinetic_energy_p_->at(p),
-    track_range_mom_mu_->at(p),
-    track_mcs_mom_mu_->at(p),
+    trk_relative_dif_mcs_range,
+    (float) trk_contained,
+    (float) num_daughters
   };
 
   // Check for inf/nans
   bool fs_v_ok = true;
-  for (size_t i=0; i<10; i++) {
+  for (size_t i=0; i<9; i++) {
     if (std::isnan(fs_v[i]) || std::isinf(fs_v[i])) {
       fs_v_ok = false;
       break;
@@ -1336,7 +1352,7 @@ int AnalysisEvent::predict_track_pid(int p, std::string model, float* out) {
 
     // Create input DMatrix
     DMatrixHandle dmat;
-    r = XGDMatrixCreateFromMat(fs_v, 1, 10, -1, &dmat);
+    r = XGDMatrixCreateFromMat(fs_v, 1, 9, -1, &dmat);
     if (r != 0) std::cout << XGBGetLastError() << std::endl;
     assert(r == 0);
  
@@ -1400,6 +1416,10 @@ void AnalysisEvent::find_muon_candidate() {
     if ( pid == 1 ) {
       muon_candidate_indices.push_back( p );
       muon_pid_scores.push_back( out[1] );
+    }
+
+    if ( pid == 3 ) {
+        proton_multiplicity_ = proton_multiplicity_ + 1;
     }
 /*
     float track_score = pfp_track_score_->at( p );
@@ -1607,6 +1627,7 @@ void AnalysisEvent::apply_selection() {
       if (xgb_pid_vec_->at(p) == 3) {
         // Proton candidate
         sel_has_p_candidate_ = true;
+        //proton_multiplicity_ = proton_multiplicity_ + 1;
         if ( track_llr_pid_score_->at(p) <= proton_pid_cut(track_length) ) {
           sel_passed_proton_pid_cut_ = true;
         }
