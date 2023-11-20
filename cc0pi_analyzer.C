@@ -1845,6 +1845,11 @@ void AnalysisEvent::compute_observables() {
     for ( int p = 0; p < num_pf_particles_; ++p ) {
       // Skip the muon candidate
       if ( p == muon_candidate_idx_ ) continue;
+
+      // Only include direct neutrino daughters (generation == 2)
+      unsigned int generation = pfp_generation_->at( p );
+      if ( generation != 2u ) continue;
+
       float p_dirx = track_dirx_->at( p );
       float p_diry = track_diry_->at( p );
       float p_dirz = track_dirz_->at( p );
