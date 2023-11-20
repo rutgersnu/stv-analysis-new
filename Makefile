@@ -6,9 +6,6 @@ univmake: univmake.C stv_root_dict.o
 analyzer: analyzer.C stv_root_dict.o
 	$(CXX) $(shell root-config --cflags --libs) -O3 -o $@ $^
 
-analyzer_ru: analyzer_ru.C
-	$(CXX) $(shell root-config --cflags --libs) -O3 -o $@ $^
-
 stv_root_dict.o:
 	$(RM) stv_root_dict*.*
 	rootcling -f stv_root_dict.cc -c LinkDef.h
