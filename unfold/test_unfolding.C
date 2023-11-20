@@ -1,4 +1,5 @@
 // Standard library includes
+#include <cmath>
 #include <iomanip>
 #include <iostream>
 #include <sstream>
@@ -8,10 +9,12 @@
 #include "TLegend.h"
 
 // STV analysis includes
-#include "../ConstrainedCalculator.hh"
 #include "../DAgostiniUnfolder.hh"
 #include "../FiducialVolume.hh"
+#include "../MatrixUtils.hh"
 #include "../MCC9SystematicsCalculator.hh"
+#include "../NormShapeCovMatrix.hh"
+#include "../PGFPlotsDumpUtils.hh"
 #include "../SliceBinning.hh"
 #include "../SliceHistogram.hh"
 #include "../WienerSVDUnfolder.hh"
@@ -89,8 +92,31 @@
 //  return result;
 //}
 
-const std::string SAMPLE_NAME = "MicroBooNE_CC1MuNp_XSec_2D_PmuCosmu_nu_MC";
-//const std::string SAMPLE_NAME = "MicroBooNE_CC1MuNp_XSec_2D_PpCosp_nu_MC";
+constexpr double BIG_DOUBLE = 1e300;
+
+void multiply_1d_hist_by_matrix( TMatrixD* mat, TH1* hist ) {
+  // Copy the histogram contents into a column vector
+  int num_bins = mat->GetNcols();
+  TMatrixD hist_mat( num_bins, 1 );
+  for ( int r = 0; r < num_bins; ++r ) {
+    hist_mat( r, 0 ) = hist->GetBinContent( r + 1 );
+  }
+
+  // Multiply the column vector by the input matrix
+  // TODO: add error handling here related to matrix dimensions
+  TMatrixD hist_mat_transformed( *mat, TMatrixD::EMatrixCreatorsOp2::kMult,
+    hist_mat );
+
+  // Update the input histogram contents with the new values
+  for ( int r = 0; r < num_bins; ++r ) {
+    double val = hist_mat_transformed( r, 0 );
+    hist->SetBinContent( r + 1, val );
+  }
+
+}
+
+//const std::string SAMPLE_NAME = "MicroBooNE_CC1MuNp_XSec_2D_PmuCosmu_nu_MC";
+const std::string SAMPLE_NAME = "MicroBooNE_CC1MuNp_XSec_2D_PpCosp_nu_MC";
 
 struct TruthFileInfo {
   TruthFileInfo() {}
@@ -107,16 +133,35 @@ struct TruthFileInfo {
 // predictions in each true bin
 std::map< std::string, TruthFileInfo > truth_file_map = {
   { "GENIE 2.12.10",
-    {"/uboone/app/users/gardiner/stv/mc/comp_cc1muNp_geniev2.root", kBlue, 1 } },
+    {"/uboone/app/users/gardiner/temp-gen/BuildEventGenerators/ubmc/comp-all/comp-gv2.root", kBlue, 1 } },
   { "GENIE 3.0.6",
-    {"/uboone/app/users/gardiner/stv/mc/comp_cc1muNp_geniev3.root", kBlack, 2} },
-  { "NEUT 5.4.0.1",
-    {"/uboone/app/users/gardiner/stv/mc/comp_cc1muNp_neut.root", kRed, 9} },
-  { "NuWro 19.02.1",
-    {"/uboone/app/users/gardiner/stv/mc/comp_cc1muNp_nuwro.root", kViolet, 7} },
- //{ "GiBUU 2019",
- //  {"/uboone/app/users/gardiner/stv/mc/comp_cc1muNp_gibuu.root", kGreen, 10} },
+    {"/uboone/app/users/gardiner/temp-gen/BuildEventGenerators/ubmc/comp-all/comp-gv3.root", kBlack, 2} },
+  { "GENIE 3.2.0 G18_02a",
+    {"/uboone/app/users/gardiner/temp-gen/BuildEventGenerators/ubmc/comp-all/comp-gv3-g1802a.root", kBlack, 2} },
+  { "GENIE 3.2.0 G21_11a",
+    {"/uboone/app/users/gardiner/temp-gen/BuildEventGenerators/ubmc/comp-all/comp-gv3-g2111a.root", kBlack, 2} },
+  { "GENIE 3.2.0 G21_11b",
+    {"/uboone/app/users/gardiner/temp-gen/BuildEventGenerators/ubmc/comp-all/comp-gv3-g2111b.root", kBlack, 2} },
+  { "NEUT 5.6.0",
+    {"/uboone/app/users/gardiner/temp-gen/BuildEventGenerators/ubmc/comp-all/comp-neut.root", kRed, 9} },
+  { "NuWro 19.02.2",
+    {"/uboone/app/users/gardiner/temp-gen/BuildEventGenerators/ubmc/comp-all/comp-nuwro.root", kViolet, 7} },
+ { "GiBUU 2021.1",
+    {"/uboone/app/users/gardiner/temp-gen/BuildEventGenerators/ubmc/mygibuu3.root", kGreen, 10} },
+};
 
+std::map< std::string, std::string > samples_to_hist_names {
+  { "unfolded data", "UnfData" },
+  { "MicroBooNE Tune", "uBTune" },
+  { "truth", "FakeData" },
+  { "GENIE 2.12.10", "gv2" },
+  { "GENIE 3.0.6", "gv3" },
+  { "GENIE 3.2.0 G18_02a", "g1802a" },
+  { "GENIE 3.2.0 G21_11a", "g2111a" },
+  { "GENIE 3.2.0 G21_11b", "g2111b" },
+  { "NEUT 5.6.0", "neut" },
+  { "NuWro 19.02.2", "nuwro" },
+  { "GiBUU 2021.1", "gibuu" },
 };
 
 struct SampleInfo {
@@ -160,10 +205,10 @@ std::map< std::string, SampleInfo > sample_info_map = {
 };
 
 // Multiplying by the conversion factor conv_factor should change a total cross
-// section value (in cm^2 / Ar) into an expected number of true event counts.
-// The value of the factor can be obtained by multiplying the number of Ar
-// targets in the fiducial volume by the integrated numu flux (for the measured
-// POT exposure) in the fiducial volume.
+// section value (in 10^{-38} cm^2 / Ar) into an expected number of true event
+// counts. The value of the factor can be obtained by multiplying the number of
+// Ar targets in the fiducial volume by the integrated numu flux (for the
+// measured POT exposure) in the fiducial volume.
 //
 // This function returns a map in which the keys are legend labels for each
 // generator model. The values are TMatrixD column vectors containing the
@@ -172,25 +217,11 @@ std::map< std::string, SampleInfo > sample_info_map = {
 std::map< std::string, TMatrixD* > get_true_events_nuisance(
   const SampleInfo& info, double conv_factor )
 {
-  // First load the vector of 2D bin widths from the widths file for the
-  // current NUISANCE sample. The vector element index is the
-  // ResponseMatrixMaker true bin number, while the value is the product of the
-  // 2D bin widths used by NUISANCE to normalize its results to a differential
-  // cross section.
-  std::vector< double > widths_2d_vec;
-  std::ifstream widths_file( info.widths_file_ );
-  double plow, phigh, coslow, coshigh;
-  while ( widths_file >> plow >> phigh >> coslow >> coshigh ) {
-    double width_2d = ( phigh - plow ) * ( coshigh - coslow );
-    widths_2d_vec.push_back( width_2d );
-  }
-
-  // Now start to prepare the result. We'll create one prediction per
-  // generator model in the truth_file_map
+  // We'll create one prediction per generator model in the truth_file_map
   std::map< std::string, TMatrixD* > truth_counts_map;
   for ( const auto& pair : truth_file_map ) {
     // First retrieve the raw NUISANCE histogram. It is expressed as a
-    // differential cross section with true bin number along the x-axis
+    // total cross section with true bin number along the x-axis
     std::string generator_label = pair.first;
     const auto& file_info = pair.second;
     std::string nuisance_file = file_info.file_name_;
@@ -215,13 +246,12 @@ std::map< std::string, TMatrixD* > get_true_events_nuisance(
     // count. Do this using the input conversion factor (integrated numu
     // flux * number of Ar targets in the fiducial volume) and the 2D bin
     // width.
-    size_t num_bins = widths_2d_vec.size();
+    size_t num_bins = temp_hist->GetNbinsX();
     for ( size_t b = 0u; b < num_bins; ++b ) {
-      double width = widths_2d_vec.at( b );
       double xsec = temp_hist->GetBinContent( b + 1 );
       double err = temp_hist->GetBinError( b + 1 );
-      temp_hist->SetBinContent( b + 1, xsec * width * conv_factor );
-      temp_hist->SetBinError( b + 1, err * width * conv_factor );
+      temp_hist->SetBinContent( b + 1, xsec * conv_factor );
+      temp_hist->SetBinError( b + 1, err * conv_factor );
     }
 
     // Now change the TH1D into a TMatrixD column vector
@@ -238,26 +268,141 @@ std::map< std::string, TMatrixD* > get_true_events_nuisance(
   return truth_counts_map;
 }
 
+
+void dump_slice_errors( const std::string& hist_col_prefix,
+  const Slice& slice, const std::map< std::string,
+  std::unique_ptr<SliceHistogram> >& slice_hist_cov_matrix_map,
+  std::map< std::string, std::vector<double> >& pgf_plots_hist_table )
+{
+  for ( const auto& pair : slice_hist_cov_matrix_map ) {
+    std::string err_name = pair.first;
+    std::string err_col_name = hist_col_prefix + '_' + err_name + "_error";
+    pgf_plots_hist_table[ err_col_name ] = std::vector<double>();
+  }
+
+  for ( const auto& bin_pair : slice.bin_map_ ) {
+    // TODO: revisit for multi-dimensional slices
+    int global_bin_idx = bin_pair.first;
+
+    for ( const auto& err_pair : slice_hist_cov_matrix_map ) {
+
+      std::string err_name = err_pair.first;
+      std::string err_col_name = hist_col_prefix + '_' + err_name + "_error";
+
+      const auto* hist = err_pair.second->hist_.get();
+      double err = hist->GetBinError( global_bin_idx );
+
+      pgf_plots_hist_table.at( err_col_name ).push_back( err );
+    }
+
+  } // slice bins
+
+  // Add a (presumably empty) overflow bin to get certain PGFPlots styles to
+  // look right.
+  for ( const auto& err_pair : slice_hist_cov_matrix_map ) {
+    std::string err_name = err_pair.first;
+    std::string err_col_name = hist_col_prefix + '_' + err_name + "_error";
+
+    pgf_plots_hist_table.at( err_col_name ).push_back( 0. );
+  }
+
+}
+
+// Helper function that dumps a lot of the results to simple text files.
+// The events_to_xsec_factor is a constant that converts expected true event
+// counts to a total cross section (10^{-38} cm^2 / Ar) via multiplication.
+void dump_overall_results( const UnfoldedMeasurement& result,
+  const std::map< std::string, std::unique_ptr<TMatrixD> >& unf_cov_matrix_map,
+  double events_to_xsec_factor, const TMatrixD& genie_cv_true_events,
+  const TMatrixD& fake_data_true_events,
+  const std::map< std::string, TMatrixD* >& generator_truth_map,
+  bool using_fake_data )
+{
+  // Dump the unfolded flux-averaged total cross sections (by converting
+  // the units on the unfolded signal event counts)
+  TMatrixD unf_signal = *result.unfolded_signal_;
+  unf_signal *= events_to_xsec_factor;
+  dump_text_column_vector( "dump/vec_table_unfolded_signal.txt", unf_signal );
+
+  // Dump similar tables for each of the theoretical predictions (and the fake
+  // data truth if applicable). Note that this function expects that the
+  // additional smearing matrix A_C has not been applied to these predictions.
+  TMatrixD temp_genie_cv = genie_cv_true_events;
+  temp_genie_cv *= events_to_xsec_factor;
+  dump_text_column_vector( "dump/vec_table_uBTune.txt", temp_genie_cv );
+
+  if ( using_fake_data ) {
+    TMatrixD temp_fake_truth = fake_data_true_events;
+    temp_fake_truth *= events_to_xsec_factor;
+    dump_text_column_vector( "dump/vec_table_FakeData.txt", temp_fake_truth );
+  }
+
+  for ( const auto& gen_pair : generator_truth_map ) {
+    std::string gen_short_name = samples_to_hist_names.at( gen_pair.first );
+    TMatrixD temp_gen = *gen_pair.second;
+    temp_gen *= events_to_xsec_factor;
+    dump_text_column_vector( "dump/vec_table_" + gen_short_name + ".txt",
+      temp_gen );
+  }
+
+  // No unit conversions are necessary for the unfolding, error propagation,
+  // and additional smearing matrices since they are dimensionless
+  dump_text_matrix( "dump/mat_table_unfolding.txt", *result.unfolding_matrix_ );
+  dump_text_matrix( "dump/mat_table_err_prop.txt", *result.err_prop_matrix_ );
+  dump_text_matrix( "dump/mat_table_add_smear.txt", *result.add_smear_matrix_ );
+
+  // Convert units on the covariance matrices one-by-one and dump them
+  for ( const auto& cov_pair : unf_cov_matrix_map ) {
+    const auto& name = cov_pair.first;
+    TMatrixD temp_cov_matrix = *cov_pair.second;
+    // Note that we need to square the unit conversion factor for the
+    // covariance matrix elements
+    temp_cov_matrix *= std::pow( events_to_xsec_factor, 2 );
+    dump_text_matrix( "dump/mat_table_cov_" + name + ".txt", temp_cov_matrix );
+  }
+
+  // Finally, dump a summary table of the flux-averaged total cross section
+  // measurements and their statistical and total uncertainties
+  TMatrixD temp_stat_cov = *unf_cov_matrix_map.at( "DataStats" );
+  TMatrixD temp_total_cov = *unf_cov_matrix_map.at( "total" );
+  temp_stat_cov *= std::pow( events_to_xsec_factor, 2 );
+  temp_total_cov *= std::pow( events_to_xsec_factor, 2 );
+
+  // Open the output file and set up the output stream so that full numerical
+  // precision is preserved in the ascii text representation
+  std::ofstream out_summary_file( "dump/xsec_summary_table.txt" );
+  out_summary_file << std::scientific
+    << std::setprecision( std::numeric_limits<double>::max_digits10 );
+
+  int num_bins = unf_signal.GetNrows();
+  out_summary_file << "numXbins " << num_bins;
+
+  for ( int bin = 0; bin < num_bins; ++bin ) {
+    double xsec = unf_signal( bin, 0 );
+    double stat_err = std::sqrt( std::max(0., temp_stat_cov(bin, bin)) );
+    double total_err = std::sqrt( std::max(0., temp_total_cov(bin, bin)) );
+    out_summary_file << '\n' << bin << "  " << xsec << "  " << stat_err
+      << "  " << total_err;
+  }
+}
+
 void test_unfolding() {
 
-  // Initialize the FilePropertiesManager and tell it to treat the NuWro
-  // MC ntuples as if they were data
-  auto& fpm = FilePropertiesManager::Instance();
-  fpm.load_file_properties( "../nuwro_file_properties.txt" );
+  //// Initialize the FilePropertiesManager and tell it to treat the NuWro
+  //// MC ntuples as if they were data
+  //auto& fpm = FilePropertiesManager::Instance();
+  //fpm.load_file_properties( "../nuwro_file_properties.txt" );
 
   const auto& sample_info = sample_info_map.at( SAMPLE_NAME );
   //const auto& respmat_file_name = sample_info.respmat_file_;
 
-  const std::string respmat_file_name( "/uboone/data/users/gardiner/"
-    "RESPMAT2DNEW.root" );
+  const std::string respmat_file_name(
+    "/uboone/data/users/gardiner/23-sept10-all-universes.root" );
 
   // Do the systematics calculations in preparation for unfolding
-  auto* syst_ptr = new ConstrainedCalculator( respmat_file_name,
-    "../systcalc.conf" );
+  //auto* syst_ptr = new MCC9SystematicsCalculator( respmat_file_name, "../systcalc_unfold_fd.conf" );
+  auto* syst_ptr = new MCC9SystematicsCalculator( respmat_file_name, "../systcalc.conf" );
   auto& syst = *syst_ptr;
-
-  auto* mcc9_ptr = new MCC9SystematicsCalculator( respmat_file_name, "../systcalc.conf" );
-  auto& mcc9 = *mcc9_ptr;
 
   // Get the tuned GENIE CV prediction in each true bin (including the
   // background true bins)
@@ -282,10 +427,6 @@ void test_unfolding() {
     fake_data_truth_hist = fake_data_univ->hist_true_.get();
   }
 
-
-  std::cout << "CC size = " << syst.get_covariance_matrix_size()
-    << ", MCC9 size = " << mcc9.get_covariance_matrix_size() << '\n';
-
   int num_ordinary_reco_bins = 0;
   int num_sideband_reco_bins = 0;
   for ( int b = 0; b < syst.reco_bins_.size(); ++b ) {
@@ -306,47 +447,78 @@ void test_unfolding() {
   auto* matrix_map_ptr = syst.get_covariances().release();
   auto& matrix_map = *matrix_map_ptr;
 
-  auto* mcc9_map_ptr = mcc9.get_covariances().release();
-  auto& mcc9_map = *mcc9_map_ptr;
-
   auto* cov_mat = matrix_map.at( "total" ).cov_matrix_.get();
-  auto* mcc9_cov_mat = mcc9_map.at( "total" ).cov_matrix_.get();
 
-  // Check ordinary reco bins
-  for ( int a = 1; a <= num_ordinary_reco_bins; ++a ) {
-     //std::cout << "a = " << a << '\n';
-     for ( int b = 1; b <= num_ordinary_reco_bins; ++b ) {
-       //std::cout << "  b = " << b << ", cm = "
-       double cm = cov_mat->GetBinContent( a, b );
-       double cm_mcc9 = mcc9_cov_mat->GetBinContent( a, b );
-       if ( cm != cm_mcc9 ) std::cout << "BAD!\n";
-     }
-  }
-
-  // Check sideband reco bins
-  for ( int c = 1; c <= num_sideband_reco_bins; ++c ) {
-     //std::cout << "c = " << c << '\n';
-     for ( int d = 1; d <= num_sideband_reco_bins; ++d ) {
-       //std::cout << "  d = " << d << ", cm = ";
-       int a = c + 2*num_ordinary_reco_bins;
-       int b = d + 2*num_ordinary_reco_bins;
-       double cm = cov_mat->GetBinContent( a, b );
-       a -= num_ordinary_reco_bins;
-       b -= num_ordinary_reco_bins;
-       double cm_mcc9 = mcc9_cov_mat->GetBinContent( a, b );
-       //std::cout << cm << ", mcc9 = " << cm_mcc9 << '\n';
-       if ( cm != cm_mcc9 ) std::cout << "BAD!\n";
-     }
-  }
-
-  constexpr int NUM_DAGOSTINI_ITERATIONS = 6;
+  constexpr int NUM_DAGOSTINI_ITERATIONS = 2;
+  constexpr bool USE_ADD_SMEAR = true;
 
   std::unique_ptr< Unfolder > unfolder (
-    new DAgostiniUnfolder( NUM_DAGOSTINI_ITERATIONS )
+    //new DAgostiniUnfolder( NUM_DAGOSTINI_ITERATIONS )
+    new DAgostiniUnfolder( DAgostiniUnfolder::ConvergenceCriterion
+      ::FigureOfMerit, 0.025 )
     //new WienerSVDUnfolder( true,
-    //WienerSVDUnfolder::RegularizationMatrixType::kSecondDeriv )
+    //  WienerSVDUnfolder::RegularizationMatrixType::kSecondDeriv )
   );
-  auto result = unfolder->unfold( mcc9 );
+
+  UnfoldedMeasurement result = unfolder->unfold( syst );
+
+  // For real data only, add some new covariance matrices in which only the
+  // signal response or the background is varied. We could calculate these
+  // for the fake data, but it seems unnecessary at this point.
+  if ( !using_fake_data ) {
+    syst.set_syst_mode( MCC9SystematicsCalculator
+      ::SystMode::VaryOnlyBackground );
+    auto* bkgd_matrix_map_ptr = syst.get_covariances().release();
+    auto& bkgd_matrix_map = *bkgd_matrix_map_ptr;
+
+    syst.set_syst_mode( MCC9SystematicsCalculator
+      ::SystMode::VaryOnlySignalResponse );
+    auto* sigresp_matrix_map_ptr = syst.get_covariances().release();
+    auto& sigresp_matrix_map = *sigresp_matrix_map_ptr;
+
+    for ( const auto& m_pair : bkgd_matrix_map ) {
+      auto& my_temp_cov_mat = matrix_map[ "bkgd_only_" + m_pair.first ];
+      my_temp_cov_mat += m_pair.second;
+    }
+
+    for ( const auto& m_pair : sigresp_matrix_map ) {
+      auto& my_temp_cov_mat = matrix_map[ "sigresp_only_" + m_pair.first ];
+      my_temp_cov_mat += m_pair.second;
+    }
+  }
+
+  // Propagate all defined covariance matrices through the unfolding procedure
+  const TMatrixD& err_prop = *result.err_prop_matrix_;
+  TMatrixD err_prop_tr( TMatrixD::kTransposed, err_prop );
+
+  std::map< std::string, std::unique_ptr<TMatrixD> > unfolded_cov_matrix_map;
+
+  for ( const auto& matrix_pair : matrix_map ) {
+    const std::string& matrix_key = matrix_pair.first;
+    auto temp_cov_mat = matrix_pair.second.get_matrix();
+
+    TMatrixD temp_mat( *temp_cov_mat, TMatrixD::EMatrixCreatorsOp2::kMult,
+      err_prop_tr );
+
+    unfolded_cov_matrix_map[ matrix_key ] = std::make_unique< TMatrixD >(
+      err_prop, TMatrixD::EMatrixCreatorsOp2::kMult, temp_mat );
+  }
+
+  // Decompose the block-diagonal pieces of the total covariance matrix
+  // into normalization, shape, and mixed components (for later plotting
+  // purposes)
+  NormShapeCovMatrix bd_ns_covmat = make_block_diagonal_norm_shape_covmat(
+    *result.unfolded_signal_, *result.cov_matrix_, syst.true_bins_ );
+
+  // Add the blockwise decomposed matrices into the map
+  unfolded_cov_matrix_map[ "total_blockwise_norm" ]
+    = std::make_unique< TMatrixD >( bd_ns_covmat.norm_ );
+
+  unfolded_cov_matrix_map[ "total_blockwise_shape" ]
+    = std::make_unique< TMatrixD >( bd_ns_covmat.shape_ );
+
+  unfolded_cov_matrix_map[ "total_blockwise_mixed" ]
+    = std::make_unique< TMatrixD >( bd_ns_covmat.mixed_ );
 
   //// Test against RooUnfold implementation of the D'Agostini method
   //auto test_response = get_test_response( mcc9 );
@@ -452,6 +624,29 @@ void test_unfolding() {
   unfolded_events->SetLineWidth( 3 );
   unfolded_events->GetXaxis()->SetRangeUser( 0, num_true_signal_bins );
 
+  // Save the fake data truth (before A_C multiplication) using a column vector
+  // of event counts
+  TMatrixD fake_data_truth( num_true_signal_bins, 1 );
+  if ( using_fake_data ) {
+    for ( int b = 0; b < num_true_signal_bins; ++b ) {
+      double true_evts = fake_data_truth_hist->GetBinContent( b + 1 );
+      fake_data_truth( b, 0 ) = true_evts;
+    }
+  }
+
+  // Save the GENIE CV model (before A_C multiplication) using a column vector
+  // of event counts
+  TMatrixD genie_cv_truth_vec( num_true_signal_bins, 1 );
+  for ( int b = 0; b < num_true_signal_bins; ++b ) {
+    double true_evts = genie_cv_truth->GetBinContent( b + 1 );
+    genie_cv_truth_vec( b, 0 ) = true_evts;
+  }
+
+  // Multiply the truth-level GENIE prediction histogram by the additional
+  // smearing matrix
+  TMatrixD* A_C = result.add_smear_matrix_.get();
+  multiply_1d_hist_by_matrix( A_C, genie_cv_truth );
+
   genie_cv_truth->SetStats( false );
   genie_cv_truth->SetLineColor( kRed );
   genie_cv_truth->SetLineWidth( 3 );
@@ -461,13 +656,16 @@ void test_unfolding() {
   genie_cv_truth->Draw( "hist same" );
 
   if ( using_fake_data ) {
+
+    // Multiply the fake data truth histogram by the additional smearing matrix
+    multiply_1d_hist_by_matrix( A_C, fake_data_truth_hist );
+
     fake_data_truth_hist->SetStats( false );
     fake_data_truth_hist->SetLineColor( kBlue );
     fake_data_truth_hist->SetLineWidth( 3 );
     fake_data_truth_hist->SetLineStyle( 2 );
     fake_data_truth_hist->Draw( "hist same" );
   }
-
 
   TLegend* lg = new TLegend( 0.15, 0.7, 0.3, 0.85 );
   lg->AddEntry( unfolded_events, "unfolded", "l" );
@@ -477,10 +675,9 @@ void test_unfolding() {
   }
 
   lg->Draw( "same" );
-  return;
 
   // Plot slices of the unfolded result
-  auto* sb_ptr = new SliceBinning( sample_info.sb_file_ );
+  auto* sb_ptr = new SliceBinning( "../mybins_all.txt" );
   auto& sb = *sb_ptr;
 
   // Get the factors needed to convert to cross-section units
@@ -488,38 +685,26 @@ void test_unfolding() {
   double integ_flux = integrated_numu_flux_in_FV( total_pot );
   double num_Ar = num_Ar_targets_in_FV();
 
+  std::cout << "INTEGRATED numu FLUX = " << integ_flux << '\n';
+  std::cout << "NUM Ar atoms in fiducial volume = " << num_Ar << '\n';
+
   // Retrieve the true-space expected event counts from NUISANCE output files
   // for each available generator model
-  double conv_factor = num_Ar * integ_flux;
+  double conv_factor = ( num_Ar * integ_flux ) / 1e38;
   auto generator_truth_map = get_true_events_nuisance( sample_info,
     conv_factor );
 
-  // Add the fake data truth using a column vector of event counts
-  TMatrixD fake_data_truth( num_true_signal_bins, 1 );
-  if ( using_fake_data ) {
-    for ( int b = 0; b < num_true_signal_bins; ++b ) {
-      double true_evts = fake_data_truth_hist->GetBinContent( b + 1 );
-      fake_data_truth( b, 0 ) = true_evts;
-    }
-  }
+  // Dump overall results to text files. Total cross section units (10^{-38}
+  // cm^2 / Ar) will be used throughout. Do this before adjusting the
+  // truth-level prediction TMatrixD objects via multiplication by A_C
+  dump_overall_results( result, unfolded_cov_matrix_map, 1.0 / conv_factor,
+    genie_cv_truth_vec, fake_data_truth, generator_truth_map,
+    using_fake_data );
 
-  // Add the GENIE CV model using a column vector of event counts
-  TMatrixD genie_cv_truth_vec( num_true_signal_bins, 1 );
-  for ( int b = 0; b < num_true_signal_bins; ++b ) {
-    double true_evts = genie_cv_truth->GetBinContent( b + 1 );
-    genie_cv_truth_vec( b, 0 ) = true_evts;
-  }
-
-  // If we're working with Wiener-SVD unfolding, then apply the additional
-  // smearing matrix to all true-space distributions (except for the unfolded
-  // data itself)
-  WienerSVDUnfolder* wsvd_ptr = dynamic_cast< WienerSVDUnfolder* >(
-    unfolder.get() );
-
-  if ( wsvd_ptr ) {
+  if ( USE_ADD_SMEAR ) {
 
     // Get access to the additional smearing matrix
-    const TMatrixD& A_C = wsvd_ptr->additional_smearing_matrix();
+    const TMatrixD& A_C = *result.add_smear_matrix_;
 
     // Start with the fake data truth if present
     if ( using_fake_data ) {
@@ -549,6 +734,20 @@ void test_unfolding() {
     // slice
     SliceHistogram* slice_unf = SliceHistogram::make_slice_histogram(
       *result.unfolded_signal_, slice, result.cov_matrix_.get() );
+
+    // Temporary copies of the unfolded true event count slices with
+    // different covariance matrices
+    std::map< std::string, std::unique_ptr<SliceHistogram> > sh_cov_map;
+    for ( const auto& uc_pair : unfolded_cov_matrix_map ) {
+      const auto& uc_name = uc_pair.first;
+      const auto& uc_matrix = uc_pair.second;
+
+      auto& uc_ptr = sh_cov_map[ uc_name ];
+      uc_ptr.reset(
+        SliceHistogram::make_slice_histogram( *result.unfolded_signal_, slice,
+        uc_matrix.get() )
+      );
+    }
 
     // Also use the GENIE CV model to do the same
     SliceHistogram* slice_cv = SliceHistogram::make_slice_histogram(
@@ -586,18 +785,22 @@ void test_unfolding() {
     int var_count = 0;
     std::string diff_xsec_denom;
     std::string diff_xsec_units_denom;
+    std::string diff_xsec_denom_latex;
+    std::string diff_xsec_units_denom_latex;
     double other_var_width = 1.;
     for ( const auto& ov_spec : slice.other_vars_ ) {
       double high = ov_spec.high_bin_edge_;
       double low = ov_spec.low_bin_edge_;
       const auto& var_spec = sb.slice_vars_.at( ov_spec.var_index_ );
-      if ( high != low ) {
+      if ( high != low && std::abs(high - low) < BIG_DOUBLE ) {
         ++var_count;
         other_var_width *= ( high - low );
         diff_xsec_denom += 'd' + var_spec.name_;
+        diff_xsec_denom_latex += " d" + var_spec.latex_name_;
         const std::string& temp_units = var_spec.units_;
         if ( !temp_units.empty() ) {
           diff_xsec_units_denom += " / " + temp_units;
+          diff_xsec_units_denom_latex += " / " + var_spec.latex_units_;
         }
       }
     }
@@ -608,7 +811,12 @@ void test_unfolding() {
       if ( temp_name != "true bin number" ) {
         var_count += slice.active_var_indices_.size();
         diff_xsec_denom += 'd' + var_spec.name_;
-        diff_xsec_units_denom += " / " + var_spec.units_;
+        diff_xsec_denom_latex += " d" + var_spec.latex_name_;
+
+        if ( !var_spec.units_.empty() ) {
+          diff_xsec_units_denom += " / " + var_spec.units_;
+          diff_xsec_units_denom_latex += " / " + var_spec.latex_units_;
+        }
       }
     }
 
@@ -619,26 +827,42 @@ void test_unfolding() {
     for ( int b = 0; b < num_slice_bins; ++b ) {
       double width = slice_unf->hist_->GetBinWidth( b + 1 );
       width *= other_var_width;
-      trans_mat( b, b ) = 1e37 / ( width * integ_flux * num_Ar );
+      trans_mat( b, b ) = 1e38 / ( width * integ_flux * num_Ar );
     }
+
+    std::string slice_y_title;
+    std::string slice_y_latex_title;
+    if ( var_count > 0 ) {
+      slice_y_title += "d";
+      slice_y_latex_title += "{$d";
+      if ( var_count > 1 ) {
+        slice_y_title += "^{" + std::to_string( var_count ) + "}";
+        slice_y_latex_title += "^{" + std::to_string( var_count ) + "}";
+      }
+      slice_y_title += "#sigma/" + diff_xsec_denom;
+      slice_y_latex_title += "\\sigma / " + diff_xsec_denom_latex;
+    }
+    else {
+      slice_y_title += "#sigma";
+      slice_y_latex_title += "\\sigma";
+    }
+    slice_y_title += " (10^{-38} cm^{2}" + diff_xsec_units_denom + " / Ar)";
+    slice_y_latex_title += "\\text{ }(10^{-38}\\text{ cm}^{2}"
+      + diff_xsec_units_denom_latex + " / \\mathrm{Ar})$}";
 
     // Convert all slice histograms from true event counts to differential
     // cross-section units
     for ( auto& pair : slice_gen_map ) {
       auto* slice_h = pair.second;
       slice_h->transform( trans_mat );
-
-      std::string slice_y_title;
-      if ( var_count > 0 ) {
-        slice_y_title += "d^{" + std::to_string( var_count ) + "}#sigma";
-        slice_y_title += '/' + diff_xsec_denom;
-      }
-      else {
-        slice_y_title += "#sigma";
-      }
-      slice_y_title += " (10^{-37} cm^{2}" + diff_xsec_units_denom + " / Ar)";
-
       slice_h->hist_->GetYaxis()->SetTitle( slice_y_title.c_str() );
+    }
+
+    // Also transform all of the unfolded data slice histograms which have
+    // specific covariance matrices
+    for ( auto& sh_cov_pair : sh_cov_map ) {
+      auto& slice_h = sh_cov_pair.second;
+      slice_h->transform( trans_mat );
     }
 
     // Keys are generator legend labels, values are the results of a chi^2
@@ -737,7 +961,60 @@ void test_unfolding() {
 
     lg->Draw( "same" );
 
+    // Dump the unfolded results to text files compatible with PGFPlots
+    std::map< std::string, std::vector<double> > slice_hist_table;
+    std::map< std::string, std::string > slice_params_table;
+
+    dump_slice_variables( sb, sl_idx, slice_params_table );
+
+    for ( const auto& pair : slice_gen_map ) {
+      const auto hist_name = samples_to_hist_names.at( pair.first );
+      const auto* slice_hist = pair.second;
+      bool include_x_coords = ( hist_name == "UnfData" );
+      bool include_y_error = include_x_coords;
+      dump_slice_histogram( hist_name, *slice_hist, slice, slice_hist_table,
+        include_y_error, include_x_coords );
+    }
+
+    dump_slice_plot_limits( *slice_unf, *slice_cv, slice, slice_params_table );
+
+    dump_slice_errors( "UnfData", slice, sh_cov_map, slice_hist_table );
+
+    // Dump the chi^2 test results
+    for ( const auto& chi2_pair : chi2_map ) {
+      const auto hist_name = samples_to_hist_names.at( chi2_pair.first );
+      const auto& chi2_result = chi2_pair.second;
+
+      // Comparing the data histogram to itself is trivial, so skip it
+      if ( hist_name == "UnfData" ) continue;
+      else {
+        slice_params_table[ hist_name + "_chi2" ]
+          = std::to_string( chi2_result.chi2_ );
+        slice_params_table[ hist_name + "_pvalue" ]
+          = std::to_string( chi2_result.p_value_ );
+      }
+    }
+
+    // Dump the total data POT and number of bins in the slice
+    slice_params_table[ "bnb_data_pot" ] = std::to_string( total_pot );
+    slice_params_table[ "num_bins" ] = std::to_string( num_slice_bins );
+
+    // Dump a LaTeX title for the y-axis
+    slice_params_table[ "y_axis_title" ] = slice_y_latex_title;
+
+    // Before moving on to the next slice, dump information about the
+    // current one to new pgfplots files that can be used for offline plotting
+    std::string output_file_prefix = "dump/pgfplots_slice_";
+    // Use at least three digits for numbering the slice output files
+    if ( sl_idx < 10 ) output_file_prefix += '0';
+    if ( sl_idx < 100 ) output_file_prefix += '0';
+    output_file_prefix += std::to_string( sl_idx );
+
+    write_pgfplots_files( output_file_prefix, slice_hist_table,
+      slice_params_table );
+
   } // slices
+  return;
 
   // ******* Also look at reco-space results
   TH1D* reco_data_hist = dynamic_cast< TH1D* >(
@@ -768,7 +1045,7 @@ void test_unfolding() {
   for ( int rb = 0; rb < num_reco_bins; ++rb ) {
 
     double mcc9_err = std::sqrt(
-      std::max( 0., mcc9_cov_mat->GetBinContent(rb + 1, rb + 1) )
+      std::max( 0., cov_mat->GetBinContent(rb + 1, rb + 1) )
     );
     reco_mc_and_ext_hist->SetBinError( rb + 1, mcc9_err );
 

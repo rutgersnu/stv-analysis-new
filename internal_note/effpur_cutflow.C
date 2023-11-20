@@ -222,22 +222,43 @@ void effpur_cutflow() {
   const std::vector< std::string > selection_defs = { "1",
   "sel_reco_vertex_in_FV",
   "sel_reco_vertex_in_FV && sel_pfp_starts_in_PCV",
+  "sel_reco_vertex_in_FV && sel_pfp_starts_in_PCV && sel_topo_cut_passed",
   "sel_nu_mu_cc",
-  "sel_nu_mu_cc && sel_muon_passed_mom_cuts",
-  "sel_nu_mu_cc && sel_no_reco_showers && sel_muon_passed_mom_cuts",
-  "sel_nu_mu_cc && sel_no_reco_showers && sel_muon_passed_mom_cuts"
-    " && sel_muon_contained",
-  "sel_nu_mu_cc && sel_no_reco_showers && sel_muon_passed_mom_cuts"
-    " && sel_muon_contained && sel_muon_quality_ok",
-  "sel_nu_mu_cc && sel_no_reco_showers && sel_muon_passed_mom_cuts"
-    " && sel_muon_contained && sel_muon_quality_ok && sel_has_p_candidate",
-  "sel_nu_mu_cc && sel_no_reco_showers && sel_muon_passed_mom_cuts"
-    " && sel_muon_contained && sel_muon_quality_ok && sel_has_p_candidate"
-    " && sel_protons_contained ",
-  "sel_nu_mu_cc && sel_no_reco_showers && sel_muon_passed_mom_cuts"
-    " && sel_muon_contained && sel_muon_quality_ok && sel_has_p_candidate"
-    " && sel_protons_contained && sel_passed_proton_pid_cut",
+  "sel_nu_mu_cc && sel_muon_contained",
+  "sel_nu_mu_cc && sel_muon_contained && sel_muon_quality_ok",
+  "sel_nu_mu_cc && sel_muon_contained && sel_muon_quality_ok"
+    " && sel_muon_passed_mom_cuts",
+  "sel_nu_mu_cc && sel_muon_contained && sel_muon_quality_ok"
+    " && sel_muon_passed_mom_cuts && sel_no_reco_showers",
+  "sel_nu_mu_cc && sel_muon_contained && sel_muon_quality_ok"
+    " && sel_muon_passed_mom_cuts && sel_no_reco_showers"
+    " && sel_has_p_candidate",
+  "sel_nu_mu_cc && sel_muon_contained && sel_muon_quality_ok"
+    " && sel_muon_passed_mom_cuts && sel_no_reco_showers"
+    " && sel_has_p_candidate && sel_protons_contained ",
+  "sel_nu_mu_cc && sel_muon_contained && sel_muon_quality_ok"
+    " && sel_muon_passed_mom_cuts && sel_no_reco_showers"
+    " && sel_has_p_candidate && sel_protons_contained "
+    " && sel_passed_proton_pid_cut",
   "sel_CCNp0pi" };
+
+  // New ntuple flags introduced at each stage of the selection. Used
+  // solely for pgfplots output (hence the weird \char 95 to get literal
+  // underscores)
+  const std::vector< std::string > selection_flags = { "",
+    "sel\\char 95reco\\char 95vertex\\char 95in\\char 95FV",
+    "sel\\char 95pfp\\char 95starts\\char 95in\\char 95PCV",
+    "sel\\char 95topo\\char 95cut\\char 95passed",
+    "sel\\char 95has\\char 95muon\\char 95candidate",
+    "sel\\char 95muon\\char 95contained",
+    "sel\\char 95muon\\char 95quality\\char 95ok",
+    "sel\\char 95muon\\char 95passed\\char 95mom\\char 95cuts",
+    "sel\\char 95no\\char 95reco\\char 95showers",
+    "sel\\char 95has\\char 95p\\char 95candidate",
+    "sel\\char 95protons\\char 95contained ",
+    "sel\\char 95passed\\char 95proton\\char 95pid\\char 95cut",
+    "sel\\char 95lead\\char 95p\\char 95passed\\char 95mom\\char 95cuts"
+  };
 
   size_t num_points = selection_defs.size();
   TGraph* eff_graph = new TGraph( num_points );
@@ -271,9 +292,14 @@ void effpur_cutflow() {
   } // selection definitions
 
   const std::vector< std::string > bin_labels = { "no cuts",
-  "in FV", "starts contained", "CCincl",
-  "#mu momentum limits", "no showers", "#mu contained", "#mu quality",
-  "has p candidate", "p contained", "proton PID", "p momentum limits" };
+  "in FV", "starts contained", "topo score", "CC incl", "#mu contained",
+  "#mu quality", "#mu momentum limits", "no showers", "has p candidate",
+  "p contained", "p PID", "p momentum limits" };
+
+  const std::vector< std::string > latex_bin_labels = { "no cuts",
+  "in FV", "starts contained", "topo score", "CC incl", "$\\mu$ contained",
+  "$\\mu$ quality", "$\\mu$ momentum limits", "no showers", "has $p$ candidate",
+  "$p$ contained", "$p$ PID", "$p$ momentum limits" };
 
   TCanvas* c1 = new TCanvas;
   c1->SetBottomMargin(0.21);
@@ -298,8 +324,8 @@ void effpur_cutflow() {
   pur_graph->SetMarkerStyle(20);
   pur_graph->Draw("same lp");
 
-  mc_pur_graph->SetLineColor(kGreen);
-  mc_pur_graph->SetMarkerColor(kGreen);
+  mc_pur_graph->SetLineColor(kBlack);
+  mc_pur_graph->SetMarkerColor(kBlack);
   mc_pur_graph->SetLineWidth(3);
   mc_pur_graph->SetMarkerStyle(20);
   mc_pur_graph->Draw("same lp");
@@ -320,9 +346,16 @@ void effpur_cutflow() {
 
   // Add the x labels in their own column
   pgfplots_table[ "x_label" ] = std::vector< std::string >();
-  for ( const auto& label : bin_labels ) {
+  for ( const auto& label : latex_bin_labels ) {
     std::string entry = '{' + label + '}';
     pgfplots_table.at( "x_label" ).push_back( entry );
+  }
+
+  // Add the selection flags in their own column
+  pgfplots_table[ "sel_flag" ] = std::vector< std::string >();
+  for ( const auto& flag : selection_flags ) {
+    std::string entry = '{' + flag + '}';
+    pgfplots_table.at( "sel_flag" ).push_back( entry );
   }
 
   write_pgfplots_file( "cutflow.txt", pgfplots_table );

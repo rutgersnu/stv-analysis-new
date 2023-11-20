@@ -12,6 +12,7 @@
 
 // STV analysis includes
 #include "MatrixUtils.hh"
+#include "NormShapeCovMatrix.hh"
 #include "SliceBinning.hh"
 #include "SystematicsCalculator.hh"
 
@@ -37,6 +38,13 @@ class SliceHistogram {
     // transformed accordingly.
     void transform( const TMatrixD& mat );
 
+    // Create a column vector with the current histogram bin contents
+    TMatrixD get_col_vect() const;
+
+    // Calculates a decomposition of the full covariance matrix into norm,
+    // mixed, and shape-only pieces
+    void calc_norm_shape_errors();
+
     struct Chi2Result {
 
       Chi2Result() {}
@@ -50,7 +58,8 @@ class SliceHistogram {
       double p_value_;
     };
 
-    Chi2Result get_chi2( const SliceHistogram& other ) const;
+    Chi2Result get_chi2( const SliceHistogram& other,
+      const double inversion_tol = DEFAULT_MATRIX_INVERSION_TOLERANCE ) const;
 
     std::unique_ptr< TH1 > hist_;
     CovMatrix cmat_;
@@ -84,7 +93,7 @@ SliceHistogram* SliceHistogram::make_slice_histogram( TH1D& reco_bin_histogram,
 
     double slice_bin_content = 0.;
     for ( const auto& rb_idx : reco_bin_set ) {
-      // The ResponseMatrixMaker reco bin indices are zero-based, so I correct
+      // The UniverseMaker reco bin indices are zero-based, so I correct
       // for this here when pulling values from the one-based input ROOT
       // histogram
       slice_bin_content += reco_bin_histogram.GetBinContent( rb_idx + 1 );
@@ -128,7 +137,7 @@ SliceHistogram* SliceHistogram::make_slice_histogram( TH1D& reco_bin_histogram,
         for ( const auto& rb_m : rb_set_a ) {
           for ( const auto& rb_n : rb_set_b ) {
             // The covariance matrix TH2D uses one-based indices even though
-            // the ResponseMatrixMaker numbering scheme is zero-based. I
+            // the UniverseMaker numbering scheme is zero-based. I
             // correct for this here.
             cov += cmat->GetBinContent( rb_m + 1, rb_n + 1 );
           } // reco bin index m
@@ -136,7 +145,6 @@ SliceHistogram* SliceHistogram::make_slice_histogram( TH1D& reco_bin_histogram,
         covmat_hist->SetBinContent( sb_a, sb_b, cov );
       } // slice bin index b
     } // slice bin index a
-
 
     // We have a finished covariance matrix for the slice. Use it to set
     // the bin errors on the slice histogram.
@@ -193,7 +201,7 @@ SliceHistogram* SliceHistogram::make_slice_histogram(
 
     double slice_bin_content = 0.;
     for ( const auto& rb_idx : reco_bin_set ) {
-      // The ResponseMatrixMaker reco bin indices are zero-based like the
+      // The UniverseMaker reco bin indices are zero-based like the
       // TMatrixD element indices
       slice_bin_content += reco_bin_counts( rb_idx, 0 );
     }
@@ -270,7 +278,7 @@ SliceHistogram* SliceHistogram::make_slice_histogram(
 
 // TODO: revisit this rough draft. Right now, an assumption is made that the
 // true and reco bins are defined in the same way with the same indices. This
-// isn't enforced by the ResponseMatrixMaker configuration itself, although
+// isn't enforced by the UniverseMaker configuration itself, although
 // it is currently consistent with what you've done so far.
 SliceHistogram* SliceHistogram::make_slice_efficiency_histogram(
   const TH1D& true_bin_histogram, const TH2D& hist_2d, const Slice& slice )
@@ -295,7 +303,7 @@ SliceHistogram* SliceHistogram::make_slice_efficiency_histogram(
     double selected_signal_evts = 0.;
     double all_signal_evts = 0.;
     for ( const auto& rb_idx : reco_bin_set ) {
-      // The ResponseMatrixMaker reco bin indices are zero-based, so I correct
+      // The UniverseMaker reco bin indices are zero-based, so I correct
       // for this here when pulling values from the one-based input ROOT
       // histogram.
       all_signal_evts += true_bin_histogram.GetBinContent( rb_idx + 1 );
@@ -326,7 +334,7 @@ SliceHistogram* SliceHistogram::make_slice_efficiency_histogram(
 }
 
 SliceHistogram::Chi2Result SliceHistogram::get_chi2(
-  const SliceHistogram& other ) const
+  const SliceHistogram& other, const double inversion_tol ) const
 {
   int num_bins = hist_->GetNbinsX();
   if ( other.hist_->GetNbinsX() != num_bins ) {
@@ -367,7 +375,7 @@ SliceHistogram::Chi2Result SliceHistogram::get_chi2(
   auto cov_matrix = cov_mat.get_matrix();
 
   // Invert the covariance matrix
-  auto inverse_cov_matrix = invert_matrix( *cov_matrix );
+  auto inverse_cov_matrix = invert_matrix( *cov_matrix, inversion_tol );
 
   // Create a 1D vector containing the difference between the two slice
   // histograms in each bin
@@ -416,13 +424,7 @@ void SliceHistogram::transform( const TMatrixD& mat ) {
     " SliceHistogram::transform()" );
 
   // Create a column vector with the current histogram bin contents
-  TMatrixD hist_vec( num_bins, 1 );
-  for ( int b = 0; b < num_bins; ++b ) {
-    // Note that TH1D bin indices are one based while TMatrixD element indices
-    // are zero-based
-    double val = hist_->GetBinContent( b + 1 );
-    hist_vec( b, 0 ) = val;
-  }
+  TMatrixD hist_vec = this->get_col_vect();
 
   // Apply the transformation matrix to the histogram and store the result in a
   // new column vector
@@ -460,7 +462,21 @@ void SliceHistogram::transform( const TMatrixD& mat ) {
   for ( int b = 0; b < num_bins; ++b ) {
     double variance = cmat_.cov_matrix_->GetBinContent( b + 1, b + 1 );
     double err = std::sqrt( std::max(0., variance) );
-     hist_->SetBinError( b + 1, err );
+    //double err = shape_errors_.at( b );
+    hist_->SetBinError( b + 1, err );
   }
 
+}
+
+// Create a column vector with the current histogram bin contents
+TMatrixD SliceHistogram::get_col_vect() const {
+  int num_bins = hist_->GetNbinsX();
+  TMatrixD hist_vec( num_bins, 1 );
+  for ( int b = 0; b < num_bins; ++b ) {
+    // Note that TH1D bin indices are one based while TMatrixD element indices
+    // are zero-based
+    double val = hist_->GetBinContent( b + 1 );
+    hist_vec( b, 0 ) = val;
+  }
+  return hist_vec;
 }

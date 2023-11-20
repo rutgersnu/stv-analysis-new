@@ -13,7 +13,7 @@
 
 // STV analysis includes
 #include "FilePropertiesManager.hh"
-#include "ResponseMatrixMaker.hh"
+#include "UniverseMaker.hh"
 
 // Helper function template that retrieves an object from a TDirectoryFile
 // and loads a pointer to it into a std::unique_ptr of the correct type
@@ -239,6 +239,9 @@ class SystematicsCalculator {
     inline std::unique_ptr< TMatrixD > get_cv_ordinary_reco_signal() const
       { return this->get_cv_ordinary_reco_helper( false ); }
 
+    inline size_t get_num_signal_true_bins() const
+      { return num_signal_true_bins_; }
+
   //protected:
 
     // Implements both get_cv_ordinary_reco_bkgd() and
@@ -320,10 +323,10 @@ class SystematicsCalculator {
     // interaction modeling
     std::map< NFT, std::unique_ptr<Universe> > alt_cv_universes_;
 
-    // True bin configuration that was used to compute the response matrices
+    // True bin configuration that was used to compute the universes
     std::vector< TrueBin > true_bins_;
 
-    // Reco bin configuration that was used to compute the response matrices
+    // Reco bin configuration that was used to compute the universes
     std::vector< RecoBin > reco_bins_;
 
     // Total POT exposure for the analyzed BNB data
@@ -384,7 +387,7 @@ SystematicsCalculator::SystematicsCalculator(
   // avoid TDirectoryFile path problems.
   std::string fpm_config_file = fpm.config_file_name();
   // Do the '/' replacement here in the same way as is done for
-  // TDirectoryFile subfolders by the ResponseMatrixMaker class
+  // TDirectoryFile subfolders by the UniverseMaker class
   fpm_config_file = ntuple_subfolder_from_file_name( fpm_config_file );
 
   std::string total_subfolder_name = TOTAL_SUBFOLDER_NAME_PREFIX
@@ -406,7 +409,7 @@ SystematicsCalculator::SystematicsCalculator(
     // Create a new TDirectoryFile as a subfolder to hold the POT-summed
     // universe histograms
     total_subdir = new TDirectoryFile( total_subfolder_name.c_str(),
-      "response matrices", "", root_tdir );
+      "universes", "", root_tdir );
 
     // Write the universes to the new subfolder for faster loading
     // later
@@ -419,7 +422,7 @@ SystematicsCalculator::SystematicsCalculator(
   }
 
   // Also load the configuration of true and reco bins used to create the
-  // response matrices
+  // universes
   std::string* true_bin_spec = nullptr;
   std::string* reco_bin_spec = nullptr;
 
@@ -687,8 +690,7 @@ void SystematicsCalculator::build_universes( TDirectoryFile& root_tdir ) {
 
       for ( const std::string& file_name : file_set ) {
 
-        std::cout << "PROCESSING response matrices for "
-          << file_name << '\n';
+        std::cout << "PROCESSING universes for " << file_name << '\n';
 
         // Default to assuming that the current ntuple file is not a fake data
         // sample. If it is a data sample (i.e., if is_mc == false), then the
@@ -820,7 +822,7 @@ void SystematicsCalculator::build_universes( TDirectoryFile& root_tdir ) {
         auto temp_2d_hist = get_object_unique_ptr< TH2D >(
           "unweighted_0_2d", *subdir );
 
-        // NOTE: the convention of the ResponseMatrixMaker class is to use
+        // NOTE: the convention of the UniverseMaker class is to use
         // x as the true axis and y as the reco axis.
         int num_true_bins = temp_2d_hist->GetXaxis()->GetNbins();
         int num_reco_bins = temp_2d_hist->GetYaxis()->GetNbins();
@@ -890,7 +892,7 @@ void SystematicsCalculator::build_universes( TDirectoryFile& root_tdir ) {
             0, num_true_bins, num_reco_bins );
 
           // Temporary pointer that will allow us to treat the single-file
-          // detector variation samples as the multi-file alternate CV samples
+          // detector variation samples and the multi-file alternate CV samples
           // on the same footing below
           Universe* temp_univ_ptr = nullptr;
 
