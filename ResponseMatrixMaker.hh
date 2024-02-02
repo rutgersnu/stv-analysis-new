@@ -526,7 +526,7 @@ void ResponseMatrixMaker::prepare_formulas() {
   }
 
   // Create one TTreeFormula for each true EventCategory
-  const auto& category_map = eci.label_map();
+/*  const auto& category_map = eci.label_map();
   for ( const auto& category_pair : category_map ) {
 
     EventCategory cur_category = category_pair.first;
@@ -542,7 +542,7 @@ void ResponseMatrixMaker::prepare_formulas() {
     cbf->SetQuickLoad( true );
 
     category_formulas_.emplace_back( std::move(cbf) );
-  }
+  }*/
 
 }
 
@@ -576,7 +576,8 @@ void ResponseMatrixMaker::build_response_matrices(
   // Set up storage for the "is_mc" boolean flag branch. If we're not working
   // with MC events, then we shouldn't do anything with the true bin counts.
   bool is_mc;
-  input_chain_.SetBranchAddress( "is_mc", &is_mc );
+  is_mc = input_chain_.GetBranchStatus("mcEntryNumber");
+  //input_chain_.SetBranchAddress( "is_mc", &is_mc );
 
   // Get the first TChain entry so that we can know the number of universes
   // used in each vector of weights

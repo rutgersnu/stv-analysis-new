@@ -703,11 +703,13 @@ void SystematicsCalculator::build_universes( TDirectoryFile& root_tdir ) {
           // TODO: use the TDirectoryFile to handle this rather than
           // pulling it out of the original ntuple file
           TFile temp_mc_file( file_name.c_str(), "read" );
-          TParameter<float>* temp_pot = nullptr;
-          temp_mc_file.GetObject( "summed_pot", temp_pot );
-          if ( !temp_pot ) throw std::runtime_error(
+          TTree* temp_mc_tree = (TTree*) temp_mc_file.Get("phaseIITriggerTree");
+          double temp_pot = 0;
+          temp_mc_tree->SetBranchAddress( "beam_pot", &temp_pot );
+          temp_mc_tree->GetEntry(0);
+          if ( temp_pot == 0 ) throw std::runtime_error(
             "Missing POT in MC file!" );
-          file_pot = temp_pot->GetVal();
+          file_pot = temp_pot;
         }
         else {
           // We can ask the FilePropertiesManager for the data POT values

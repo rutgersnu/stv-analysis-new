@@ -1,0 +1,2 @@
+# Run 1 MC
+/annie/data/users/jminock/standard_tank_ntuples/PhaseIITree_1mil_ntuple.root
