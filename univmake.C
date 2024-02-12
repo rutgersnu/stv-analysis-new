@@ -29,7 +29,8 @@ bool is_reweightable_mc_ntuple( const std::string& input_file_name ) {
   if ( !stv_tree ) throw std::runtime_error( "Missing TTree \"stv_tree\" in"
     " the input ROOT file " + input_file_name );
 
-  TBranch* cv_weight_br = stv_tree->GetBranch( TUNE_WEIGHT_NAME.c_str() );
+//  TBranch* cv_weight_br = stv_tree->GetBranch( TUNE_WEIGHT_NAME.c_str() );
+  TBranch* cv_weight_br = stv_tree->GetBranch( "XSecWeights" );
   bool has_cv_weights = ( cv_weight_br != nullptr );
   return has_cv_weights;
 }
@@ -111,7 +112,7 @@ int main( int argc, char* argv[] ) {
     if ( has_event_weights ) {
       // If the check above was successful, then run all of the histogram
       // calculations in the usual way
-      resp_mat.build_response_matrices();
+      resp_mat.build_response_matrices( { "XSecWeights","FluxWeights" } );
     }
     else {
       // Passing in the fake list of explicit branch names below instructs

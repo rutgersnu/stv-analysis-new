@@ -29,7 +29,8 @@ void tutorial_slice_plots() {
   #endif
 
   auto* syst_ptr = new MCC9SystematicsCalculator(
-    "/uboone/data/users/gardiner/tutorial_univmake_output.root",
+    "/annie/data/users/jminock/stv-analysis/stv-univmake-output.root",
+//    "/exp/annie/app/users/jminock/stv-analysis-new/output.root",
     "systcalc.conf" );
   auto& syst = *syst_ptr;
 
@@ -44,7 +45,9 @@ void tutorial_slice_plots() {
     reco_bnb_hist->Add( reco_ext_hist );
   #endif
 
-  TH2D* category_hist = syst.cv_universe().hist_categ_.get();
+  syst.cv_universe().hist_categ_.get()->Draw();
+  std::cout << "AAAA" << std::endl;
+  TH2D* category_hist = syst.cv_universe().hist_categ_.get(); //causing error
 
   // Total MC+EXT prediction in reco bin space. Start by getting EXT.
   TH1D* reco_mc_plus_ext_hist = dynamic_cast< TH1D* >(
@@ -52,7 +55,7 @@ void tutorial_slice_plots() {
   reco_mc_plus_ext_hist->SetDirectory( nullptr );
 
   // Add in the CV MC prediction
-  reco_mc_plus_ext_hist->Add( syst.cv_universe().hist_reco_.get() );
+  reco_mc_plus_ext_hist->Add( syst.cv_universe().hist_reco_.get() ); //causing error
 
   // Keys are covariance matrix types, values are CovMatrix objects that
   // represent the corresponding matrices
@@ -62,6 +65,7 @@ void tutorial_slice_plots() {
   auto* sb_ptr = new SliceBinning( "tutorial_slice_config.txt" );
   auto& sb = *sb_ptr;
 
+  std::cout << "BBBB" << std::endl;
   for ( size_t sl_idx = 0u; sl_idx < sb.slices_.size(); ++sl_idx ) {
 
     const auto& slice = sb.slices_.at( sl_idx );
@@ -95,7 +99,7 @@ void tutorial_slice_plots() {
     // Go in reverse so that signal ends up on top. Note that this index is
     // one-based to match the ROOT histograms
     int cat_bin_index = cat_map.size();
-    for ( auto iter = cat_map.crbegin(); iter != cat_map.crend(); ++iter )
+/*    for ( auto iter = cat_map.crbegin(); iter != cat_map.crend(); ++iter )
     {
       EventCategory cat = iter->first;
       TH1D* temp_mc_hist = category_hist->ProjectionY( "temp_mc_hist",
@@ -113,7 +117,7 @@ void tutorial_slice_plots() {
 
       --cat_bin_index;
     }
-
+*/
     TCanvas* c1 = new TCanvas;
     slice_bnb->hist_->SetLineColor( kBlack );
     slice_bnb->hist_->SetLineWidth( 3 );
@@ -154,7 +158,7 @@ void tutorial_slice_plots() {
     // included in the output pgfplots file regardless of whether they appear
     // in this vector.
     const std::vector< std::string > cov_mat_keys = { "total",
-      "detVar_total", "flux", "reint", "xsec_total", "POT", "numTargets",
+      "detVar_total", "flux_total", "reint", "xsec_total", "POT", "numTargets",
       "MCstats", "EXTstats", "BNBstats"
     };
 

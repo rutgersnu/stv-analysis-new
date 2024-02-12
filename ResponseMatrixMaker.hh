@@ -55,6 +55,7 @@ std::string ntuple_subfolder_from_file_name( const std::string& file_name ) {
 const std::string SPLINE_WEIGHT_NAME = "weight_splines_general_Spline";
 const std::string TUNE_WEIGHT_NAME = "weight_TunedCentralValue_UBGenie";
 
+
 // Special weight name to store the unweighted event counts
 const std::string UNWEIGHTED_NAME = "unweighted";
 
@@ -648,8 +649,8 @@ void ResponseMatrixMaker::build_response_matrices(
       // below
       auto& wm = wh.weight_map();
       if ( wm.size() > 0u ) {
-        spline_weight = wm.at( SPLINE_WEIGHT_NAME )->front();
-        tune_weight = wm.at( TUNE_WEIGHT_NAME )->front();
+//        spline_weight = wm.at( SPLINE_WEIGHT_NAME )->front();
+//        tune_weight = wm.at( TUNE_WEIGHT_NAME )->front();
       }
     } // MC event
 
@@ -659,14 +660,14 @@ void ResponseMatrixMaker::build_response_matrices(
 
       auto& u_vec = universes_.at( wgt_name );
 
-      for ( size_t u = 0u; u < wgt_vec->size(); ++u ) {
+      for ( size_t u = 0u; u < wgt_vec.size(); ++u ) {
 
         // No need to use the slightly slower "at" here since we're directly
         // looping over the weight vector
-        double w = wgt_vec->operator[]( u );
+        double w = wgt_vec[u];
 
         // Multiply by any needed CV correction weights
-        apply_cv_correction_weights( wgt_name, w, spline_weight, tune_weight );
+//        apply_cv_correction_weights( wgt_name, w, spline_weight, tune_weight );
 
         // Deal with NaNs, etc. to make a "safe weight" in all cases
         double safe_wgt = safe_weight( w );
@@ -742,7 +743,7 @@ void ResponseMatrixMaker::prepare_universes( const WeightHandler& wh ) {
 
   for ( const auto& pair : wh.weight_map() ) {
     const std::string& weight_name = pair.first;
-    size_t num_universes = pair.second->size();
+    size_t num_universes = pair.second.size();
 
     std::vector< Universe > u_vec;
 

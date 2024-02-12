@@ -984,6 +984,7 @@ void SystematicsCalculator::build_universes( TDirectoryFile& root_tdir ) {
         // Now handle the reweightable systematic universes
         else if ( is_reweightable_mc ) {
 
+          std::cout << "about to handle reweightable sys unis" << std::endl;
           // If this is our first reweightable MC ntuple file, then build
           // the map of reweighting universes from the 2D histogram keys in
           // its TDirectoryFile.
@@ -1119,6 +1120,7 @@ void SystematicsCalculator::build_universes( TDirectoryFile& root_tdir ) {
   // histograms.
   if ( using_fake_data ) {
 
+    std::cout << "using fake data" << std::endl;
     const TH1D* ext_hist = data_hists_.at( NFT::kExtBNB ).get(); // EXT data
     TH1D* bnb_hist = data_hists_.at( NFT::kOnBNB ).get();
 
