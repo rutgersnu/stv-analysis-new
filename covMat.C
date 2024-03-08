@@ -90,9 +90,31 @@ struct SystInfo {
 
 const std::map< std::string, SystInfo > SYSTEMATICS_TO_USE {
 
-  { "flux", {"weight_flux_all_", 1000u, false, true, true} },
+  { "flux_expskin", {"weight_expskin_FluxUnisim_", 1000u, false, true, true} },
 
-  { "reint", {"weight_reint_all_", 1000u, false, true, false} },
+  { "flux_horncurrent", {"weight_horncurrent_FluxUnisim_", 1000u, false, true, true} },
+
+  { "flux_kminus", {"weight_kminus_PrimaryHadronNormalization_", 1000u, false, true, true} },
+
+  { "flux_kplus", {"weight_kplus_PrimaryHadronFeynmanScaling_", 1000u, false, true, true} },
+
+  { "flux_kzero", {"weight_kzero_PrimaryHadronSanfordWang_", 1000u, false, true, true} },
+
+  { "flux_nucleoninexsec", {"weight_nucleoninexsec_FluxUnisim_", 1000u, false, true, true} },
+
+  { "flux_nucleonqexsec", {"weight_nucleonqexsec_FluxUnisim_", 1000u, false, true, true} },
+
+  { "flux_nucleontotxsec", {"weight_nucleontotxsec_FluxUnisim_", 1000u, false, true, true} },
+
+  { "flux_piminus", {"weight_piminus_PrimaryHadronSWCentralSplineVariation_", 1000u, false, true, true} },
+
+  { "flux_pioninexsec", {"weight_pioninexsec_FluxUnisim_", 1000u, false, true, true} },
+
+  { "flux_pionqexsec", {"weight_pionqexsec_FluxUnisim_", 1000u, false, true, true} },
+
+  { "flux_piontotxsec", {"weight_piontotxsec_FluxUnisim_", 1000u, false, true, true} },
+
+  { "flux_piplus", {"weight_piplus_PrimaryHadronSWCentralSplineVariation_", 1000u, false, true, true} },
 
   { "xsec_multi", {"weight_All_UBGenie_", 500u, false, true, false} },
 
@@ -106,29 +128,23 @@ const std::map< std::string, SystInfo > SYSTEMATICS_TO_USE {
   { "xsec_NormCCCOH", {"weight_NormCCCOH_UBGenie_", 2u,
     false, false, false} },
 
-  { "xsec_NormNCCOH", {"weight_NormNCCOH_UBGenie_", 2u,
+  { "xsec_NormNCCOH", {"Norm_NCCOH_", 2u,
     false, false, false} },
 
-  { "xsec_RPA_CCQE", {"weight_RPA_CCQE_UBGenie_", 2u,
+  { "xsec_RPA_CCQE", {"RPA_CCQE_", 2u,
     false, true, false} },
 
-  { "xsec_ThetaDelta2NRad", {"weight_ThetaDelta2NRad_UBGenie_", 2u,
+  { "xsec_ThetaDelta2NRad", {"ThetaDelta2NRad_", 2u,
     false, false, false} },
 
-  { "xsec_Theta_Delta2Npi", {"weight_Theta_Delta2Npi_UBGenie_", 2u,
+  { "xsec_Theta_Delta2Npi", {"Theta_Delta2Npi_", 2u,
     false, false, false} },
 
-  { "xsec_VecFFCCQEshape", {"weight_VecFFCCQEshape_UBGenie_", 2u,
+  { "xsec_VecFFCCQEshape", {"VecFFCCQEshape_", 2u,
     false, false, false} },
 
-  { "xsec_XSecShape_CCMEC", {"weight_XSecShape_CCMEC_UBGenie_", 2u,
-    false, false, false} },
-
-  { "xsec_xsr_scc_Fa3_SCC", {"weight_xsr_scc_Fa3_SCC_", 10u,
-    false, true, false} },
-
-  { "xsec_xsr_scc_Fv3_SCC", {"weight_xsr_scc_Fv3_SCC_", 10u,
-    false, true, false} },
+  { "xsec_XSecShape_CCMEC", {"XSecShape_CCMEC_", 2u,
+    false, false, false} }
 
 };
 
