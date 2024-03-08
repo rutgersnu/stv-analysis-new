@@ -8,8 +8,6 @@
 
 // ROOT includes
 #include "TTree.h"
-#include "TROOT.h"
-#include "TFile.h"
 
 // STV analysis includes
 #include "TreeUtils.hh"
@@ -40,13 +38,11 @@ class WeightHandler {
     // Access the owned map
     inline const auto& weight_map() const { return weight_map_; }
     inline auto& weight_map() { return weight_map_; }
-
   protected:
 
     // Keys are branch names in the input TTree, values point to vectors of
     // event weights
-//    std::map< std::string, MyPointer< std::vector<double> > > weight_map_;
-    std::map< std::string, std::vector<double> > weight_map_;
+    std::map< std::string, MyPointer< std::vector<double> > > weight_map_;
 };
 
 void WeightHandler::set_branch_addresses( TTree& in_tree,
@@ -89,20 +85,13 @@ void WeightHandler::set_branch_addresses( TTree& in_tree,
     // Assume that all included branches store a std::vector<double> object.
     // Set the branch address so that the vector can accept input from the
     // TTree.
-    std::map< std::string, std::vector<double> >* weights = new std::map< std::string, std::vector<double> >();
-    in_tree.SetBranchAddress( br_name.c_str(),&weights);
-    in_tree.GetEntry(0);
-    for(auto& x: *weights){
-//      weight_map_[ x.first ] = MyPointer< std::vector<double> >();
-      weight_map_[ x.first ] = x.second;
+    weight_map_[ br_name ] = MyPointer< std::vector<double> >();
 
-      auto& wgt_vec = weight_map_.at( x.first );
-//      auto& wgt_vec = x.second;
-//      set_object_input_branch_address( in_tree, x.first, wgt_vec );
-    }
+    auto& wgt_vec = weight_map_.at( br_name );
+    set_object_input_branch_address( in_tree, br_name, wgt_vec );
+
   }
 
-  in_tree.ResetBranchAddresses();
   // TODO: add warning or exception for branches listed in the input vector
   // that could not be found in the TTree?
 }
@@ -133,8 +122,7 @@ void WeightHandler::add_branch( TTree& in_tree,
   }
 
   // Set up the new branch assuming that it holds a vector of double values
-//  weight_map_[ branch_name ] = MyPointer< std::vector<double> >();
-  weight_map_[ branch_name ] = std::vector<double>();
+  weight_map_[ branch_name ] = MyPointer< std::vector<double> >();
   auto& wgt_vec = weight_map_.at( branch_name );
-//  set_object_input_branch_address( in_tree, branch_name, wgt_vec );
+  set_object_input_branch_address( in_tree, branch_name, wgt_vec );
 }

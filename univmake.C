@@ -112,7 +112,7 @@ int main( int argc, char* argv[] ) {
     if ( has_event_weights ) {
       // If the check above was successful, then run all of the histogram
       // calculations in the usual way
-      resp_mat.build_response_matrices( { "XSecWeights","FluxWeights" } );
+      resp_mat.build_response_matrices();
     }
     else {
       // Passing in the fake list of explicit branch names below instructs

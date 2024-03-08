@@ -650,21 +650,21 @@ void ResponseMatrixMaker::build_response_matrices(
       auto& wm = wh.weight_map();
       if ( wm.size() > 0u ) {
 //        spline_weight = wm.at( SPLINE_WEIGHT_NAME )->front();
-//        tune_weight = wm.at( TUNE_WEIGHT_NAME )->front();
+        tune_weight = wm.at( TUNE_WEIGHT_NAME )->front();
       }
     } // MC event
-
+//AAAAAA
     for ( const auto& pair : wh.weight_map() ) {
       const std::string& wgt_name = pair.first;
       const auto& wgt_vec = pair.second;
 
       auto& u_vec = universes_.at( wgt_name );
 
-      for ( size_t u = 0u; u < wgt_vec.size(); ++u ) {
+      for ( size_t u = 0u; u < wgt_vec->size(); ++u ) {
 
         // No need to use the slightly slower "at" here since we're directly
         // looping over the weight vector
-        double w = wgt_vec[u];
+        double w = wgt_vec->operator[]( u );
 
         // Multiply by any needed CV correction weights
 //        apply_cv_correction_weights( wgt_name, w, spline_weight, tune_weight );
@@ -743,7 +743,7 @@ void ResponseMatrixMaker::prepare_universes( const WeightHandler& wh ) {
 
   for ( const auto& pair : wh.weight_map() ) {
     const std::string& weight_name = pair.first;
-    size_t num_universes = pair.second.size();
+    size_t num_universes = pair.second->size();
 
     std::vector< Universe > u_vec;
 
