@@ -30,16 +30,18 @@ void tutorial_slice_plots() {
   #endif
 
   auto* syst_ptr = new MCC9SystematicsCalculator(
-    "/annie/data/users/jminock/stv-analysis/stv-univmake-output-20k.root",
+    "/exp/annie/data/users/jminock/stv-analysis/stv-univmake-output-20k.root",
 //    "/exp/annie/app/users/jminock/stv-analysis-new/output.root",
     "systcalc.conf" );
   auto& syst = *syst_ptr;
+
 
   // Get access to the relevant histograms owned by the SystematicsCalculator
   // object. These contain the reco bin counts that we need to populate the
   // slices below.
   TH1D* reco_bnb_hist = syst.data_hists_.at( NFT::kOnBNB ).get();
   TH1D* reco_ext_hist = syst.data_hists_.at( NFT::kExtBNB ).get();
+
 
   #ifdef USE_FAKE_DATA
     // Add the EXT to the "data" when working with fake data
@@ -48,21 +50,26 @@ void tutorial_slice_plots() {
 
   TH2D* category_hist = syst.cv_universe().hist_categ_.get();
 
+
   // Total MC+EXT prediction in reco bin space. Start by getting EXT.
   TH1D* reco_mc_plus_ext_hist = dynamic_cast< TH1D* >(
     reco_ext_hist->Clone("reco_mc_plus_ext_hist") );
   reco_mc_plus_ext_hist->SetDirectory( nullptr );
 
+
   // Add in the CV MC prediction
   reco_mc_plus_ext_hist->Add( syst.cv_universe().hist_reco_.get() );
+
 
   // Keys are covariance matrix types, values are CovMatrix objects that
   // represent the corresponding matrices
   auto* matrix_map_ptr = syst.get_covariances().release();
   auto& matrix_map = *matrix_map_ptr;
 
+
   auto* sb_ptr = new SliceBinning( "tutorial_slice_config.txt" );
   auto& sb = *sb_ptr;
+
 
   for ( size_t sl_idx = 0u; sl_idx < sb.slices_.size(); ++sl_idx ) {
 
@@ -155,14 +162,17 @@ void tutorial_slice_plots() {
     // in the ROOT plot. All configured fractional uncertainties will be
     // included in the output pgfplots file regardless of whether they appear
     // in this vector.
-    const std::vector< std::string > cov_mat_keys = { "total", "flux_total", "xsec_total"};
+//    const std::vector< std::string > cov_mat_keys = { "total", "flux_total", "xsec_total"};
+    const std::vector< std::string > cov_mat_keys = { "total", "xsec_total"};
+//    const std::vector< std::string > cov_mat_keys = { "flux_expskin", "flux_horncurrent", "flux_kminus", "flux_kplus", "flux_kzero", "flux_nucleoninexsec", "flux_nucleonqexsec", "flux_nucleontotxsec", "flux_piminus", "flux_pioninexsec", "flux_pionqexsec", "flux_piontotxsec", "flux_piplus"};
+//    const std::vector< std::string > cov_mat_keys = { "flux_expskin", "flux_horncurrent"};
 
     // Loop over the various systematic uncertainties
     int color = 1;
     for ( const auto& pair : matrix_map ) {
 
       const auto& key = pair.first;
-      std::cout << "key: " << key << std::endl;
+//      std::cout << "key: " << key << std::endl;
       const auto& cov_matrix = pair.second;
 
       SliceHistogram* slice_for_syst = SliceHistogram::make_slice_histogram(
@@ -179,7 +189,7 @@ void tutorial_slice_plots() {
         double err = slice_for_syst->hist_->GetBinError( global_bin_idx );
         double frac = 0.;
         if ( y > 0. ) frac = err / y;
-	std::cout << "frac: " << frac << ", y: " << y << ", err: " << err << std::endl;
+//	std::cout << "frac: " << frac << ", y: " << y << ", err: " << err << std::endl;
         slice_for_syst->hist_->SetBinContent( global_bin_idx, frac );
         slice_for_syst->hist_->SetBinError( global_bin_idx, 0. );
       }

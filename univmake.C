@@ -29,8 +29,10 @@ bool is_reweightable_mc_ntuple( const std::string& input_file_name ) {
   if ( !stv_tree ) throw std::runtime_error( "Missing TTree \"stv_tree\" in"
     " the input ROOT file " + input_file_name );
 
-//  TBranch* cv_weight_br = stv_tree->GetBranch( TUNE_WEIGHT_NAME.c_str() );
-  TBranch* cv_weight_br = stv_tree->GetBranch( "XSecWeights" );
+  TBranch* cv_weight_br = stv_tree->GetBranch( TUNE_WEIGHT_NAME.c_str() );
+//  TBranch* cv_weight_br = stv_tree->GetBranch( "XSecWeights" );
+//    TBranch* cv_weight_br = stv_tree->GetBranch( "FluxWeights" );
+
   bool has_cv_weights = ( cv_weight_br != nullptr );
   return has_cv_weights;
 }

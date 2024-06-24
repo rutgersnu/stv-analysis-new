@@ -90,6 +90,19 @@ void apply_cv_correction_weights( const std::string& wgt_name,
     wgt *= spline_weight;
   }
   else if ( wgt_name == "weight_flux_all"
+    || wgt_name == "weight_expskin_FluxUnisim"
+    || wgt_name == "weight_horncurrent_FluxUnisim"
+    || wgt_name == "weight_nucleoninexsec_FluxUnisim"
+    || wgt_name == "weight_nucleonqexsec_FluxUnisim"
+    || wgt_name == "weight_nucleontotxsec_FluxUnisim"
+    || wgt_name == "weight_pioninexsec_FluxUnisim"
+    || wgt_name == "weight_pionqexsec_FluxUnisim"
+    || wgt_name == "weight_piontotxsec_FluxUnisim"
+    || wgt_name == "weight_kminus_PrimaryHadronNormalization"
+    || wgt_name == "weight_kplus_PrimaryHadronFeynmanScaling"
+    || wgt_name == "weight_kzero_PrimaryHadronSanfordWang"
+    || wgt_name == "weight_piminus_PrimaryHadronSWCentralSplineVariation"
+    || wgt_name == "weight_piplus_PrimaryHadronSWCentralSplineVariation"
     || wgt_name == "weight_reint_all"
     || wgt_name == "weight_xsr_scc_Fa3_SCC"
     || wgt_name == "weight_xsr_scc_Fv3_SCC" )
@@ -681,6 +694,7 @@ void ResponseMatrixMaker::build_response_matrices(
           // applied via safe_weight() above
           universe.hist_true_->Fill( tb.bin_index_, tb.weight_ * safe_wgt );
           for ( const auto& rb : matched_reco_bins ) {
+//            std::cout << "safe weight: " << safe_wgt << ", true weight: " << tb.weight_ << ", reco weight: " << rb.weight_ << std::endl;
             universe.hist_2d_->Fill( tb.bin_index_, rb.bin_index_,
               tb.weight_ * rb.weight_ * safe_wgt );
           } // reco bins
