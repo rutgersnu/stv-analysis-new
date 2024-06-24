@@ -89,7 +89,8 @@
 //  return result;
 //}
 
-const std::string SAMPLE_NAME = "MicroBooNE_CC1MuNp_XSec_2D_PmuCosmu_nu_MC";
+const std::string SAMPLE_NAME = "ANNIE_CC0pi_XSec_2D_PmuCosmu_nu_MC";
+//const std::string SAMPLE_NAME = "MicroBooNE_CC1MuNp_XSec_2D_PmuCosmu_nu_MC";
 //const std::string SAMPLE_NAME = "MicroBooNE_CC1MuNp_XSec_2D_PpCosp_nu_MC";
 
 struct TruthFileInfo {
@@ -106,14 +107,14 @@ struct TruthFileInfo {
 // describing nuiscomp output files containing the differential cross-section
 // predictions in each true bin
 std::map< std::string, TruthFileInfo > truth_file_map = {
-  { "GENIE 2.12.10",
-    {"/uboone/app/users/gardiner/stv/mc/comp_cc1muNp_geniev2.root", kBlue, 1 } },
+//  { "GENIE 2.12.10",
+//    {"/uboone/app/users/gardiner/stv/mc/comp_cc1muNp_geniev2.root", kBlue, 1 } },
   { "GENIE 3.0.6",
-    {"/uboone/app/users/gardiner/stv/mc/comp_cc1muNp_geniev3.root", kBlack, 2} },
-  { "NEUT 5.4.0.1",
-    {"/uboone/app/users/gardiner/stv/mc/comp_cc1muNp_neut.root", kRed, 9} },
-  { "NuWro 19.02.1",
-    {"/uboone/app/users/gardiner/stv/mc/comp_cc1muNp_nuwro.root", kViolet, 7} },
+    {"/pnfs/annie/persistent/simulations/genie3/G1810a0211a/standard/tank/gntp.0.ghep.root", kBlack, 2} }, //WHAT FILE
+//  { "NEUT 5.4.0.1",
+//    {"/uboone/app/users/gardiner/stv/mc/comp_cc1muNp_neut.root", kRed, 9} },
+//  { "NuWro 19.02.1",
+//    {"/uboone/app/users/gardiner/stv/mc/comp_cc1muNp_nuwro.root", kViolet, 7} },
  //{ "GiBUU 2019",
  //  {"/uboone/app/users/gardiner/stv/mc/comp_cc1muNp_gibuu.root", kGreen, 10} },
 
@@ -143,7 +144,7 @@ struct SampleInfo {
 
 // Keys are NUISANCE sample names, values are SampleInfo objects that give
 // the corresponding input file paths needed for this script
-std::map< std::string, SampleInfo > sample_info_map = {
+std::map< std::string, SampleInfo > sample_info_map = { //WHAT FILES TO SUB
 
   // 2D muon measurement
   { "MicroBooNE_CC1MuNp_XSec_2D_PmuCosmu_nu_MC", { "/uboone/data/users"
@@ -244,32 +245,37 @@ void test_unfolding() {
   // MC ntuples as if they were data
   auto& fpm = FilePropertiesManager::Instance();
   fpm.load_file_properties( "../nuwro_file_properties.txt" );
-
+  std::cout << "1111" << std::endl;
+ 
   const auto& sample_info = sample_info_map.at( SAMPLE_NAME );
   //const auto& respmat_file_name = sample_info.respmat_file_;
-
-  const std::string respmat_file_name( "/uboone/data/users/gardiner/"
-    "RESPMAT2DNEW.root" );
+  std::cout << "2222" << std::endl;
+ 
+  const std::string respmat_file_name( "/exp/annie/data/users/jminock/stv-analysis/stv-univmake-output-20k.root" );
 
   // Do the systematics calculations in preparation for unfolding
   auto* syst_ptr = new ConstrainedCalculator( respmat_file_name,
     "../systcalc.conf" );
   auto& syst = *syst_ptr;
-
+  std::cout << "1111" << std::endl;
+ 
   auto* mcc9_ptr = new MCC9SystematicsCalculator( respmat_file_name, "../systcalc.conf" );
   auto& mcc9 = *mcc9_ptr;
-
+  std::cout << "1111" << std::endl;
+ 
   // Get the tuned GENIE CV prediction in each true bin (including the
   // background true bins)
   TH1D* genie_cv_truth = syst.cv_universe().hist_true_.get();
   int num_true_bins = genie_cv_truth->GetNbinsX();
-
+  std::cout << "1111" << std::endl;
+ 
   // While we're at it, clone the histogram and zero it out. We'll fill this
   // one with our unfolded result for easy comparison
   TH1D* unfolded_events = dynamic_cast< TH1D* >(
     genie_cv_truth->Clone("unfolded_events") );
   unfolded_events->Reset();
-
+  std::cout << "1111" << std::endl;
+ 
   // If present, then get the fake data event counts in each true bin
   // (including the background true bins). We hope to approximately reproduce
   // these event counts in the signal true bins via unfolding the fake data.
@@ -513,13 +519,15 @@ void test_unfolding() {
   // If we're working with Wiener-SVD unfolding, then apply the additional
   // smearing matrix to all true-space distributions (except for the unfolded
   // data itself)
-  WienerSVDUnfolder* wsvd_ptr = dynamic_cast< WienerSVDUnfolder* >(
+/*  WienerSVDUnfolder* wsvd_ptr = dynamic_cast< WienerSVDUnfolder* >(
     unfolder.get() );
 
   if ( wsvd_ptr ) {
 
     // Get access to the additional smearing matrix
     const TMatrixD& A_C = wsvd_ptr->additional_smearing_matrix();
+
+
 
     // Start with the fake data truth if present
     if ( using_fake_data ) {
@@ -540,7 +548,8 @@ void test_unfolding() {
       *truth_mat = ac_temp;
     }
   }
-
+*/
+  std::cout << "AAAAAAA" << std::endl;
   for ( size_t sl_idx = 0u; sl_idx < sb.slices_.size(); ++sl_idx ) {
 
     const auto& slice = sb.slices_.at( sl_idx );
@@ -624,6 +633,7 @@ void test_unfolding() {
 
     // Convert all slice histograms from true event counts to differential
     // cross-section units
+    // CONVERT TO ANNIE
     for ( auto& pair : slice_gen_map ) {
       auto* slice_h = pair.second;
       slice_h->transform( trans_mat );
@@ -739,6 +749,7 @@ void test_unfolding() {
 
   } // slices
 
+  std::cout << "BBBBB" << std::endl;
   // ******* Also look at reco-space results
   TH1D* reco_data_hist = dynamic_cast< TH1D* >(
     syst.data_hists_.at( NFT::kOnBNB )->Clone( "reco_data_hist" )
@@ -765,6 +776,7 @@ void test_unfolding() {
   // signal region
   auto meas = syst.get_measured_events();
 
+  std::cout << "CCCCCCCC" << std::endl;
   for ( int rb = 0; rb < num_reco_bins; ++rb ) {
 
     double mcc9_err = std::sqrt(
@@ -789,6 +801,7 @@ void test_unfolding() {
 
   }
 
+  std::cout << "DDDDDDDD" << std::endl;
   TCanvas* c2 = new TCanvas;
 
   reco_data_hist->SetLineColor( kBlack );

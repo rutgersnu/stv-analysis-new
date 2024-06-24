@@ -1,0 +1,17 @@
+#
+# All triggers [EXT and beam-on] are scaled to Genie CV's POT [verified on March 17th, 2024]
+#
+# Beam-off data
+/exp/uboone/data/users/englezos/jointxsec/ru_github/stv-analysis-new/stv-analysis-new/output_files/version_April_26th_outdim_to_4_and_momentum_corrections/ru-stv_bnb_beam_off_peleeTuple_uboone_v08_00_00_70_run1.root 1 extBNB 505610559 0
+/exp/uboone/data/users/englezos/jointxsec/ru_github/stv-analysis-new/stv-analysis-new/output_files/version_April_26th_outdim_to_4_and_momentum_corrections/ru-stv_bnb_beam_off_peleeTuple_uboone_v08_00_00_70_run2.root 2 extBNB 598606710 0
+/exp/uboone/data/users/englezos/jointxsec/ru_github/stv-analysis-new/stv-analysis-new/output_files/version_April_26th_outdim_to_4_and_momentum_corrections/ru-stv_bnb_beam_off_peleeTuple_uboone_v08_00_00_70_run3.root 3 extBNB 1058852292 0
+#
+# Genie fake data (triggers based on real onBNB data for each run)
+/exp/uboone/data/users/englezos/jointxsec/ru_github/stv-analysis-new/stv-analysis-new/output_files/version_April_26th_outdim_to_4_and_momentum_corrections/ru-stv_overlay_peleeTuple_uboone_v08_00_00_70_run1_nu_closure.root 1 onBNB 286650995 1.28278E+21
+/exp/uboone/data/users/englezos/jointxsec/ru_github/stv-analysis-new/stv-analysis-new/output_files/version_April_26th_outdim_to_4_and_momentum_corrections/ru-stv_overlay_peleeTuple_uboone_v08_00_00_70_run2_nu_closure.root 2 onBNB 240688993 1.01592E+21
+/exp/uboone/data/users/englezos/jointxsec/ru_github/stv-analysis-new/stv-analysis-new/output_files/version_April_26th_outdim_to_4_and_momentum_corrections/ru-stv_overlay_peleeTuple_uboone_v08_00_00_70_run3_nu_closure.root 3 onBNB 314057038 1.31355E+21
+#
+# numu MC samples
+/exp/uboone/data/users/englezos/jointxsec/ru_github/stv-analysis-new/stv-analysis-new/output_files/version_April_26th_outdim_to_4_and_momentum_corrections/ru-stv_overlay_peleeTuple_uboone_v08_00_00_70_run1_nu.root 1 numuMC
+/exp/uboone/data/users/englezos/jointxsec/ru_github/stv-analysis-new/stv-analysis-new/output_files/version_April_26th_outdim_to_4_and_momentum_corrections/ru-stv_overlay_peleeTuple_uboone_v08_00_00_70_run2_nu.root 2 numuMC
+/exp/uboone/data/users/englezos/jointxsec/ru_github/stv-analysis-new/stv-analysis-new/output_files/version_April_26th_outdim_to_4_and_momentum_corrections/ru-stv_overlay_peleeTuple_uboone_v08_00_00_70_run3_nu.root 3 numuMC

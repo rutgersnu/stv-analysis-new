@@ -1,18 +1,14 @@
 tutorial_1D_proton
 phaseIITriggerTree
-7
-0 0 "trueCC && trueAngle >= 0.8 && trueAngle < 0.95"
-0 0 "trueCC && trueAngle >= 0.95 && trueAngle < 1"
+5
 0 1 "trueCC && trueMuonEnergy >= 600 && trueMuonEnergy < 810"
 0 1 "trueCC && trueMuonEnergy >= 810 && trueMuonEnergy < 910"
 0 1 "trueCC && trueMuonEnergy >= 910 && trueMuonEnergy < 1005"
 0 1 "trueCC && trueMuonEnergy >= 1005 && trueMuonEnergy < 1100"
 0 1 "trueCC && trueMuonEnergy >= 1100 && trueMuonEnergy < 1200"
-7
-0 0 "numMRDTracks > 0 && simpleRecoCosTheta >= 0.8 && simpleRecoCosTheta < 0.95"
-0 0 "numMRDTracks > 0 && simpleRecoCosTheta >= 0.95 && simpleRecoCosTheta < 1"
-0 1 "numMRDTracks > 0 && simpleRecoEnergy >= 600 && simpleRecoEnergy < 810"
-0 1 "numMRDTracks > 0 && simpleRecoEnergy >= 810 && simpleRecoEnergy < 910"
-0 1 "numMRDTracks > 0 && simpleRecoEnergy >= 910 && simpleRecoEnergy < 1005"
-0 1 "numMRDTracks > 0 && simpleRecoEnergy >= 1005 && simpleRecoEnergy < 1100"
-0 1 "numMRDTracks > 0 && simpleRecoEnergy >= 1100 && simpleRecoEnergy < 1200"
+5
+0 1 "numMRDTracks > 0 && simpleRecoEnergy + 130 >= 600 && simpleRecoEnergy + 130 < 810"
+0 1 "numMRDTracks > 0 && simpleRecoEnergy + 130 >= 810 && simpleRecoEnergy + 130 < 910"
+0 1 "numMRDTracks > 0 && simpleRecoEnergy + 130 >= 910 && simpleRecoEnergy + 130 < 1005"
+0 1 "numMRDTracks > 0 && simpleRecoEnergy + 130 >= 1005 && simpleRecoEnergy + 130 < 1100"
+0 1 "numMRDTracks > 0 && simpleRecoEnergy + 130 >= 1100 && simpleRecoEnergy + 130 < 1200"

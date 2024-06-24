@@ -288,7 +288,7 @@ class SystematicsCalculator {
 
     // Central value universe name
     const std::string CV_UNIV_NAME = "weight_TunedCentralValue_UBGenie";
-//    const std::string CV_UNIV_NAME = "All";
+//    const std::string CV_UNIV_NAME = "weight_horncurrent_FluxUnisim";
 
     // Beginning of the subdirectory name for the TDirectoryFile containing the
     // POT-summed histograms for the various universes across all analysis
@@ -615,6 +615,7 @@ void SystematicsCalculator::load_universes( TDirectoryFile& total_subdir ) {
   }
 
   total_bnb_data_pot_ = temp_pot->GetVal();
+  std::cout << "total bnb data pot" << total_bnb_data_pot_ << std::endl;
 
 }
 
@@ -715,6 +716,7 @@ void SystematicsCalculator::build_universes( TDirectoryFile& root_tdir ) {
           if ( temp_pot == 0 ) throw std::runtime_error(
             "Missing POT in MC file!" );
           file_pot = temp_pot;
+          file_pot = 1.56e+19; //ACTUALLY FIX THIS SO IT'S NOT 3.2545e16
         }
         else {
           // We can ask the FilePropertiesManager for the data POT values
