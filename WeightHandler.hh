@@ -38,7 +38,6 @@ class WeightHandler {
     // Access the owned map
     inline const auto& weight_map() const { return weight_map_; }
     inline auto& weight_map() { return weight_map_; }
-
   protected:
 
     // Keys are branch names in the input TTree, values point to vectors of

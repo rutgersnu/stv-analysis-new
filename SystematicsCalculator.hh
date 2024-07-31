@@ -288,6 +288,7 @@ class SystematicsCalculator {
 
     // Central value universe name
     const std::string CV_UNIV_NAME = "weight_TunedCentralValue_UBGenie";
+//    const std::string CV_UNIV_NAME = "weight_horncurrent_FluxUnisim";
 
     // Beginning of the subdirectory name for the TDirectoryFile containing the
     // POT-summed histograms for the various universes across all analysis
@@ -396,6 +397,7 @@ SystematicsCalculator::SystematicsCalculator(
   // total_subfolder_name.
   TDirectoryFile* total_subdir = nullptr;
   root_tdir->GetObject( total_subfolder_name.c_str(), total_subdir );
+  std::cout << "total subfolder name: " << total_subfolder_name << std::endl;
 
   if ( !total_subdir ) {
 
@@ -482,6 +484,7 @@ void SystematicsCalculator::load_universes( TDirectoryFile& total_subdir ) {
     size_t temp_idx = key.find_last_of( '_' );
 
     std::string univ_name = key.substr( 0, temp_idx );
+//    std::cout << "Universe name: " << univ_name << std::endl;
     std::string univ_index_str = key.substr( temp_idx + 1u );
 
     int univ_index = std::stoi( univ_index_str );
@@ -540,12 +543,14 @@ void SystematicsCalculator::load_universes( TDirectoryFile& total_subdir ) {
     // name stores all of the MC information for the "data." Save it in the
     // dedicated fake data Universe object.
     else if ( univ_name == "FakeDataMC" ) {
+      std::cout << "111111" << std::endl;
       std::cout << "******* USING FAKE DATA *******\n";
       fake_data_universe_ = std::move( temp_univ );
     }
     else {
       // If we've made it here, then we're working with a universe
       // for a reweightable systematic variation
+//      std::cout << "This universe has a reweightable systematic variation" << std::endl;
 
       // If we do not already have a map entry for this kind of universe,
       // then create one
@@ -610,6 +615,7 @@ void SystematicsCalculator::load_universes( TDirectoryFile& total_subdir ) {
   }
 
   total_bnb_data_pot_ = temp_pot->GetVal();
+  std::cout << "total bnb data pot" << total_bnb_data_pot_ << std::endl;
 
 }
 
@@ -703,11 +709,14 @@ void SystematicsCalculator::build_universes( TDirectoryFile& root_tdir ) {
           // TODO: use the TDirectoryFile to handle this rather than
           // pulling it out of the original ntuple file
           TFile temp_mc_file( file_name.c_str(), "read" );
-          TParameter<float>* temp_pot = nullptr;
-          temp_mc_file.GetObject( "summed_pot", temp_pot );
-          if ( !temp_pot ) throw std::runtime_error(
+          TTree* temp_mc_tree = (TTree*) temp_mc_file.Get("phaseIITriggerTree");
+          double temp_pot = 0;
+          temp_mc_tree->SetBranchAddress( "beam_pot", &temp_pot );
+          temp_mc_tree->GetEntry(0);
+          if ( temp_pot == 0 ) throw std::runtime_error(
             "Missing POT in MC file!" );
-          file_pot = temp_pot->GetVal();
+          file_pot = temp_pot;
+          file_pot = 1.56e+19; //ACTUALLY FIX THIS SO IT'S NOT 3.2545e16
         }
         else {
           // We can ask the FilePropertiesManager for the data POT values
@@ -982,6 +991,7 @@ void SystematicsCalculator::build_universes( TDirectoryFile& root_tdir ) {
         // Now handle the reweightable systematic universes
         else if ( is_reweightable_mc ) {
 
+          std::cout << "about to handle reweightable sys unis" << std::endl;
           // If this is our first reweightable MC ntuple file, then build
           // the map of reweighting universes from the 2D histogram keys in
           // its TDirectoryFile.
@@ -1117,6 +1127,7 @@ void SystematicsCalculator::build_universes( TDirectoryFile& root_tdir ) {
   // histograms.
   if ( using_fake_data ) {
 
+    std::cout << "using fake data" << std::endl;
     const TH1D* ext_hist = data_hists_.at( NFT::kExtBNB ).get(); // EXT data
     TH1D* bnb_hist = data_hists_.at( NFT::kOnBNB ).get();
 
@@ -1479,6 +1490,7 @@ std::unique_ptr< CovMatrixMap > SystematicsCalculator::get_covariances() const
       // systematic variation universes
       std::string weight_key;
       config_file >> weight_key;
+      std::cout << "Weight key: " << weight_key << std::endl;
 
       // Retrieve the vector of universes
       auto end = rw_universes_.cend();

@@ -17,27 +17,31 @@
 
 using NFT = NtupleFileType;
 
-#define USE_FAKE_DATA ""
+//#define USE_FAKE_DATA ""
 
 void tutorial_slice_plots() {
 
   #ifdef USE_FAKE_DATA
     // Initialize the FilePropertiesManager and tell it to treat the NuWro
     // MC ntuples as if they were data
+    std::cout << "Using NuWro" << std::endl;
     auto& fpm = FilePropertiesManager::Instance();
     fpm.load_file_properties( "nuwro_file_properties.txt" );
   #endif
 
   auto* syst_ptr = new MCC9SystematicsCalculator(
-    "/uboone/data/users/gardiner/tutorial_univmake_output.root",
+    "/exp/annie/data/users/jminock/stv-analysis/stv-univmake-output-20k.root",
+//    "/exp/annie/app/users/jminock/stv-analysis-new/output.root",
     "systcalc.conf" );
   auto& syst = *syst_ptr;
+
 
   // Get access to the relevant histograms owned by the SystematicsCalculator
   // object. These contain the reco bin counts that we need to populate the
   // slices below.
   TH1D* reco_bnb_hist = syst.data_hists_.at( NFT::kOnBNB ).get();
   TH1D* reco_ext_hist = syst.data_hists_.at( NFT::kExtBNB ).get();
+
 
   #ifdef USE_FAKE_DATA
     // Add the EXT to the "data" when working with fake data
@@ -46,21 +50,26 @@ void tutorial_slice_plots() {
 
   TH2D* category_hist = syst.cv_universe().hist_categ_.get();
 
+
   // Total MC+EXT prediction in reco bin space. Start by getting EXT.
   TH1D* reco_mc_plus_ext_hist = dynamic_cast< TH1D* >(
     reco_ext_hist->Clone("reco_mc_plus_ext_hist") );
   reco_mc_plus_ext_hist->SetDirectory( nullptr );
 
+
   // Add in the CV MC prediction
   reco_mc_plus_ext_hist->Add( syst.cv_universe().hist_reco_.get() );
+
 
   // Keys are covariance matrix types, values are CovMatrix objects that
   // represent the corresponding matrices
   auto* matrix_map_ptr = syst.get_covariances().release();
   auto& matrix_map = *matrix_map_ptr;
 
+
   auto* sb_ptr = new SliceBinning( "tutorial_slice_config.txt" );
   auto& sb = *sb_ptr;
+
 
   for ( size_t sl_idx = 0u; sl_idx < sb.slices_.size(); ++sl_idx ) {
 
@@ -68,11 +77,11 @@ void tutorial_slice_plots() {
 
     // We now have all of the reco bin space histograms that we need as input.
     // Use them to make new histograms in slice space.
-    SliceHistogram* slice_bnb = SliceHistogram::make_slice_histogram(
-      *reco_bnb_hist, slice, &matrix_map.at("BNBstats") );
+//    SliceHistogram* slice_bnb = SliceHistogram::make_slice_histogram(
+//      *reco_bnb_hist, slice, &matrix_map.at("BNBstats") );
 
-    SliceHistogram* slice_ext = SliceHistogram::make_slice_histogram(
-      *reco_ext_hist, slice, &matrix_map.at("EXTstats") );
+//    SliceHistogram* slice_ext = SliceHistogram::make_slice_histogram(
+//      *reco_ext_hist, slice, &matrix_map.at("EXTstats") );
 
     SliceHistogram* slice_mc_plus_ext = SliceHistogram::make_slice_histogram(
       *reco_mc_plus_ext_hist, slice, &matrix_map.at("total") );
@@ -85,10 +94,10 @@ void tutorial_slice_plots() {
     // Build a stack of categorized central-value MC predictions plus the
     // extBNB contribution in slice space
     const auto& eci = EventCategoryInterpreter::Instance();
-    eci.set_ext_histogram_style( slice_ext->hist_.get() );
+//    eci.set_ext_histogram_style( slice_ext->hist_.get() );
 
     THStack* slice_pred_stack = new THStack( "mc+ext", "" );
-    slice_pred_stack->Add( slice_ext->hist_.get() ); // extBNB
+//    slice_pred_stack->Add( slice_ext->hist_.get() ); // extBNB
 
     const auto& cat_map = eci.label_map();
 
@@ -115,7 +124,7 @@ void tutorial_slice_plots() {
     }
 
     TCanvas* c1 = new TCanvas;
-    slice_bnb->hist_->SetLineColor( kBlack );
+/*    slice_bnb->hist_->SetLineColor( kBlack );
     slice_bnb->hist_->SetLineWidth( 3 );
     slice_bnb->hist_->SetMarkerStyle( kFullCircle );
     slice_bnb->hist_->SetMarkerSize( 0.8 );
@@ -127,11 +136,11 @@ void tutorial_slice_plots() {
     slice_bnb->hist_->Draw( "e" );
 
     slice_pred_stack->Draw( "hist same" );
-
+*/
     slice_mc_plus_ext->hist_->SetLineWidth( 3 );
     slice_mc_plus_ext->hist_->Draw( "same hist e" );
 
-    slice_bnb->hist_->Draw( "same e" );
+//    slice_bnb->hist_->Draw( "same e" );
 
     //std::string out_pdf_name = "plot_slice_";
     //if ( sl_idx < 10 ) out_pdf_name += "0";
@@ -153,16 +162,17 @@ void tutorial_slice_plots() {
     // in the ROOT plot. All configured fractional uncertainties will be
     // included in the output pgfplots file regardless of whether they appear
     // in this vector.
-    const std::vector< std::string > cov_mat_keys = { "total",
-      "detVar_total", "flux", "reint", "xsec_total", "POT", "numTargets",
-      "MCstats", "EXTstats", "BNBstats"
-    };
+//    const std::vector< std::string > cov_mat_keys = { "total", "flux_total", "xsec_total"};
+    const std::vector< std::string > cov_mat_keys = { "total", "xsec_total"};
+//    const std::vector< std::string > cov_mat_keys = { "flux_expskin", "flux_horncurrent", "flux_kminus", "flux_kplus", "flux_kzero", "flux_nucleoninexsec", "flux_nucleonqexsec", "flux_nucleontotxsec", "flux_piminus", "flux_pioninexsec", "flux_pionqexsec", "flux_piontotxsec", "flux_piplus"};
+//    const std::vector< std::string > cov_mat_keys = { "flux_expskin", "flux_horncurrent"};
 
     // Loop over the various systematic uncertainties
-    int color = 0;
+    int color = 1;
     for ( const auto& pair : matrix_map ) {
 
       const auto& key = pair.first;
+//      std::cout << "key: " << key << std::endl;
       const auto& cov_matrix = pair.second;
 
       SliceHistogram* slice_for_syst = SliceHistogram::make_slice_histogram(
@@ -179,6 +189,7 @@ void tutorial_slice_plots() {
         double err = slice_for_syst->hist_->GetBinError( global_bin_idx );
         double frac = 0.;
         if ( y > 0. ) frac = err / y;
+//	std::cout << "frac: " << frac << ", y: " << y << ", err: " << err << std::endl;
         slice_for_syst->hist_->SetBinContent( global_bin_idx, frac );
         slice_for_syst->hist_->SetBinError( global_bin_idx, 0. );
       }

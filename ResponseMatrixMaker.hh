@@ -55,6 +55,7 @@ std::string ntuple_subfolder_from_file_name( const std::string& file_name ) {
 const std::string SPLINE_WEIGHT_NAME = "weight_splines_general_Spline";
 const std::string TUNE_WEIGHT_NAME = "weight_TunedCentralValue_UBGenie";
 
+
 // Special weight name to store the unweighted event counts
 const std::string UNWEIGHTED_NAME = "unweighted";
 
@@ -89,6 +90,19 @@ void apply_cv_correction_weights( const std::string& wgt_name,
     wgt *= spline_weight;
   }
   else if ( wgt_name == "weight_flux_all"
+    || wgt_name == "weight_expskin_FluxUnisim"
+    || wgt_name == "weight_horncurrent_FluxUnisim"
+    || wgt_name == "weight_nucleoninexsec_FluxUnisim"
+    || wgt_name == "weight_nucleonqexsec_FluxUnisim"
+    || wgt_name == "weight_nucleontotxsec_FluxUnisim"
+    || wgt_name == "weight_pioninexsec_FluxUnisim"
+    || wgt_name == "weight_pionqexsec_FluxUnisim"
+    || wgt_name == "weight_piontotxsec_FluxUnisim"
+    || wgt_name == "weight_kminus_PrimaryHadronNormalization"
+    || wgt_name == "weight_kplus_PrimaryHadronFeynmanScaling"
+    || wgt_name == "weight_kzero_PrimaryHadronSanfordWang"
+    || wgt_name == "weight_piminus_PrimaryHadronSWCentralSplineVariation"
+    || wgt_name == "weight_piplus_PrimaryHadronSWCentralSplineVariation"
     || wgt_name == "weight_reint_all"
     || wgt_name == "weight_xsr_scc_Fa3_SCC"
     || wgt_name == "weight_xsr_scc_Fv3_SCC" )
@@ -526,7 +540,7 @@ void ResponseMatrixMaker::prepare_formulas() {
   }
 
   // Create one TTreeFormula for each true EventCategory
-  const auto& category_map = eci.label_map();
+/*  const auto& category_map = eci.label_map();
   for ( const auto& category_pair : category_map ) {
 
     EventCategory cur_category = category_pair.first;
@@ -542,7 +556,7 @@ void ResponseMatrixMaker::prepare_formulas() {
     cbf->SetQuickLoad( true );
 
     category_formulas_.emplace_back( std::move(cbf) );
-  }
+  }*/
 
 }
 
@@ -576,7 +590,8 @@ void ResponseMatrixMaker::build_response_matrices(
   // Set up storage for the "is_mc" boolean flag branch. If we're not working
   // with MC events, then we shouldn't do anything with the true bin counts.
   bool is_mc;
-  input_chain_.SetBranchAddress( "is_mc", &is_mc );
+  is_mc = input_chain_.GetBranchStatus("mcEntryNumber");
+  //input_chain_.SetBranchAddress( "is_mc", &is_mc );
 
   // Get the first TChain entry so that we can know the number of universes
   // used in each vector of weights
@@ -647,11 +662,11 @@ void ResponseMatrixMaker::build_response_matrices(
       // below
       auto& wm = wh.weight_map();
       if ( wm.size() > 0u ) {
-        spline_weight = wm.at( SPLINE_WEIGHT_NAME )->front();
+//        spline_weight = wm.at( SPLINE_WEIGHT_NAME )->front();
         tune_weight = wm.at( TUNE_WEIGHT_NAME )->front();
       }
     } // MC event
-
+//AAAAAA
     for ( const auto& pair : wh.weight_map() ) {
       const std::string& wgt_name = pair.first;
       const auto& wgt_vec = pair.second;
@@ -665,7 +680,7 @@ void ResponseMatrixMaker::build_response_matrices(
         double w = wgt_vec->operator[]( u );
 
         // Multiply by any needed CV correction weights
-        apply_cv_correction_weights( wgt_name, w, spline_weight, tune_weight );
+//        apply_cv_correction_weights( wgt_name, w, spline_weight, tune_weight );
 
         // Deal with NaNs, etc. to make a "safe weight" in all cases
         double safe_wgt = safe_weight( w );
@@ -679,6 +694,7 @@ void ResponseMatrixMaker::build_response_matrices(
           // applied via safe_weight() above
           universe.hist_true_->Fill( tb.bin_index_, tb.weight_ * safe_wgt );
           for ( const auto& rb : matched_reco_bins ) {
+//            std::cout << "safe weight: " << safe_wgt << ", true weight: " << tb.weight_ << ", reco weight: " << rb.weight_ << std::endl;
             universe.hist_2d_->Fill( tb.bin_index_, rb.bin_index_,
               tb.weight_ * rb.weight_ * safe_wgt );
           } // reco bins
